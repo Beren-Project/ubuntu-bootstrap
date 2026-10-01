@@ -1,0 +1,44 @@
+#!/bin/bash
+# Runs entirely as the normal integration user. Stage 0 obtains Python if absent.
+set -euo pipefail
+scenario=${1:-all}
+freshness=${2:-fresh}
+cd /workspace
+if [[ "$freshness" == fresh ]]; then
+    mkdir -p "$HOME/.config/zellij" "$HOME/.config/mermaid"
+    printf 'excluded zellij sentinel\n' > "$HOME/.config/zellij/config.kdl"
+    printf 'excluded mermaid sentinel\n' > "$HOME/.config/mermaid/pptr.json"
+    printf 'old shell config\n' > "$HOME/.zshrc"
+    printf '[user]\n name = Integration Fixture\n email = fixture@example.invalid\n' > "$HOME/.gitconfig.local"
+    sha256sum "$HOME/.bashrc" "$HOME/.profile" "$HOME/.config/zellij/config.kdl" "$HOME/.config/mermaid/pptr.json" "$HOME/.gitconfig.local" > "$HOME/excluded.sha256"
+fi
+if [[ "$scenario" == all || "$scenario" == base ]]; then
+    # Fixture setup, confined to the container user; makes consent paths repeatable.
+    sudo chsh -s /bin/bash engineer
+    # Intentionally capture root rejection in the normal test user's log.
+    # shellcheck disable=SC2024
+    if sudo env HOME=/root /workspace/bootstrap --non-interactive --no-change-shell > "$HOME/root-rejection.log" 2>&1; then
+        echo 'ERROR whole-program root invocation accepted'; exit 1
+    fi
+    grep -q 'normal user' "$HOME/root-rejection.log"
+    /workspace/bootstrap --non-interactive --no-change-shell
+    /usr/bin/python3 -B /workspace/tests/container_checks.py base
+    /usr/bin/python3 -B /workspace/tests/container_checks.py snapshot
+    /workspace/bootstrap --non-interactive --no-change-shell
+    /usr/bin/python3 -B /workspace/tests/container_checks.py repeat
+    /usr/bin/python3 -B /workspace/tests/container_checks.py prompts
+    /usr/bin/python3 -B /workspace/tests/container_checks.py failures
+fi
+if [[ "$scenario" == all || "$scenario" == engineering ]]; then
+    /workspace/bootstrap --non-interactive --no-change-shell --build --ngspice --openmodelica --vim --nvim --emacs --julia
+    /usr/bin/python3 -B /workspace/tests/container_checks.py engineering
+    /usr/bin/python3 -B /workspace/tests/container_checks.py snapshot
+    /workspace/bootstrap --non-interactive --no-change-shell --build --ngspice --openmodelica --vim --nvim --emacs --julia
+    /usr/bin/python3 -B /workspace/tests/container_checks.py repeat
+fi
+if [[ "$scenario" == all || "$scenario" == update ]]; then
+    /usr/bin/python3 -B /workspace/tests/container_checks.py unrelated
+    /workspace/bootstrap --non-interactive --no-change-shell --update --build --ngspice --openmodelica --vim --nvim --emacs --julia
+    /usr/bin/python3 -B /workspace/tests/container_checks.py update
+fi
+echo "OK real Ubuntu 26.04 integration ($scenario, $freshness)"

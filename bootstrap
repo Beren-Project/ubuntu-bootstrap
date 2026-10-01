@@ -1,0 +1,41 @@
+#!/bin/sh
+# Stage 0: only obtain the system Python runtime, then hand off to modules.
+set -eu
+bootstrap_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+case "${1:-}" in
+    -h|--help)
+        if [ -x /usr/bin/python3 ]; then
+            exec /usr/bin/python3 -B "$bootstrap_dir/bootstrap_lib/cli.py" --help
+        fi
+        echo 'Usage: ./bootstrap [--build] [--julia] [--ngspice] [--openmodelica] [--vim] [--nvim] [--emacs]'
+        echo 'Automation: --non-interactive --no-change-shell (or --change-shell). Updates: --update.'
+        echo 'Run as your normal user. See README.md for ownership and additional options.'
+        exit 0 ;;
+esac
+if [ "$(id -u)" -eq 0 ]; then
+    echo 'ERROR Launch bootstrap as your normal user, without sudo. Bootstrap elevates individual system operations.' >&2
+    exit 1
+fi
+# /etc/os-release is trusted system configuration, not a user-provided script.
+# shellcheck disable=SC1091
+. /etc/os-release
+bootstrap_release=$(awk -F '"' '/^ubuntu_release = / {print $2; exit}' "$bootstrap_dir/config/bootstrap.toml")
+bootstrap_codename=$(awk -F '"' '/^ubuntu_codename = / {print $2; exit}' "$bootstrap_dir/config/bootstrap.toml")
+if [ "${ID:-}" != ubuntu ] || [ "${VERSION_ID:-}" != "$bootstrap_release" ] || [ "${VERSION_CODENAME:-}" != "$bootstrap_codename" ]; then
+    echo "ERROR Only Ubuntu $bootstrap_release ($bootstrap_codename) is supported." >&2
+    exit 1
+fi
+case "$(uname -m)" in
+    x86_64|aarch64) ;;
+    *) echo 'ERROR Supported architectures are x86_64 and best-effort ARM64.' >&2; exit 1 ;;
+esac
+if [ ! -x /usr/bin/python3 ]; then
+    command -v sudo >/dev/null || { echo 'ERROR Install sudo and give your normal user sudo access first.' >&2; exit 1; }
+    bootstrap_sudo=sudo
+    for bootstrap_arg in "$@"; do
+        [ "$bootstrap_arg" != --non-interactive ] || bootstrap_sudo='sudo -n'
+    done
+    $bootstrap_sudo apt-get update
+    $bootstrap_sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3
+fi
+exec /usr/bin/python3 -B "$bootstrap_dir/bootstrap_lib/cli.py" "$@"

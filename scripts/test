@@ -1,0 +1,18 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+/usr/bin/python3 -B -m unittest discover -s tests -p 'test_*.py' -v
+sh -n bootstrap scripts/test scripts/test-podman
+if command -v shellcheck >/dev/null 2>&1; then
+    shellcheck bootstrap scripts/test scripts/test-podman tests/container-scenario
+fi
+/usr/bin/python3 -B - <<'PY'
+import ast
+from pathlib import Path
+from bootstrap_lib.config import load_manifest
+load_manifest()
+for directory in ('bootstrap_lib', 'tests'):
+    for path in Path(directory).rglob('*.py'):
+        ast.parse(path.read_text(), filename=str(path))
+print('OK manifest, Python AST and shell syntax')
+PY

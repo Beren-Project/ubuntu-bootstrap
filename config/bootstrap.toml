@@ -1,0 +1,151 @@
+# Desired ownership, channels and immutable source pins. Receipts are observations.
+schema = 1
+ubuntu_release = "26.04"
+ubuntu_codename = "resolute"
+defaults = ["apt", "rust", "cargo", "python", "node", "dotfiles"]
+
+[apt]
+base = ["ca-certificates", "curl", "git", "gh", "python3", "zsh", "tmux", "fzf", "wl-clipboard"]
+build = ["build-essential", "pkg-config", "cmake", "ninja-build"]
+cargo_source = ["build-essential", "pkg-config", "libssl-dev"]
+ngspice = ["bison", "flex", "libx11-dev", "libxaw7-dev", "libxmu-dev", "libxext-dev", "libxft-dev", "libfontconfig-dev", "libxrender-dev", "libfreetype-dev", "libreadline-dev", "libfftw3-dev", "libsndfile1-dev", "libsamplerate0-dev"]
+openmodelica = ["gnupg"]
+vim = ["vim"]
+emacs = ["emacs-nox"]
+
+[profiles.apt]
+depends = []
+arm64 = "supported"
+[profiles.rust]
+depends = ["apt"]
+arm64 = "supported"
+[profiles.cargo]
+depends = ["rust"]
+arm64 = "supported"
+[profiles.python]
+depends = ["apt"]
+arm64 = "supported"
+[profiles.node]
+depends = ["cargo"]
+arm64 = "supported"
+[profiles.dotfiles]
+depends = ["cargo", "python", "node"]
+arm64 = "unqualified"
+[profiles.build]
+depends = ["apt"]
+arm64 = "supported"
+[profiles.julia]
+depends = ["apt"]
+arm64 = "supported"
+[profiles.ngspice]
+depends = ["build"]
+arm64 = "unqualified"
+[profiles.openmodelica]
+# APT resolves omc's upstream dependencies; no generic build-profile dependency.
+depends = ["apt"]
+arm64 = "supported"
+[profiles.vim]
+depends = ["apt"]
+arm64 = "supported"
+[profiles.nvim]
+depends = ["apt"]
+arm64 = "unqualified"
+[profiles.emacs]
+depends = ["apt"]
+arm64 = "supported"
+
+[rust]
+channel = "stable"
+installer = "https://sh.rustup.rs"
+binstall_repository = "cargo-bins/cargo-binstall"
+
+[[cargo_tools]]
+crate = "cargo-update"
+bins = ["cargo-install-update", "cargo-install-update-config"]
+arm64 = "unqualified"
+[[cargo_tools]]
+crate = "starship"
+bins = ["starship"]
+arm64 = "supported"
+[[cargo_tools]]
+crate = "bat"
+bins = ["bat"]
+arm64 = "supported"
+[[cargo_tools]]
+crate = "eza"
+bins = ["eza"]
+arm64 = "supported"
+[[cargo_tools]]
+crate = "fd-find"
+bins = ["fd"]
+arm64 = "supported"
+[[cargo_tools]]
+crate = "fnm"
+bins = ["fnm"]
+arm64 = "supported"
+binstall_format = "zip"
+binstall_bin_dir = "fnm"
+binstall_urls = { amd64 = "https://github.com/Schniz/fnm/releases/download/v{version}/fnm-linux.zip", arm64 = "https://github.com/Schniz/fnm/releases/download/v{version}/fnm-arm64.zip" }
+[[cargo_tools]]
+crate = "git-delta"
+bins = ["delta"]
+arm64 = "supported"
+binstall_format = "tgz"
+binstall_bin_dir = "delta-{version}-{target}/delta"
+binstall_urls = { amd64 = "https://github.com/dandavison/delta/releases/download/{version}/delta-{version}-x86_64-unknown-linux-gnu.tar.gz", arm64 = "https://github.com/dandavison/delta/releases/download/{version}/delta-{version}-aarch64-unknown-linux-gnu.tar.gz" }
+[[cargo_tools]]
+crate = "ripgrep"
+bins = ["rg"]
+arm64 = "supported"
+[[cargo_tools]]
+crate = "zoxide"
+bins = ["zoxide"]
+arm64 = "supported"
+[[cargo_tools]]
+crate = "macchina"
+bins = ["macchina"]
+arm64 = "supported"
+binstall_format = "tgz"
+binstall_bin_dir = "macchina"
+binstall_urls = { amd64 = "https://github.com/Macchina-CLI/macchina/releases/download/v{version}/macchina-v{version}-linux-gnu-x86_64.tar.gz", arm64 = "https://github.com/Macchina-CLI/macchina/releases/download/v{version}/macchina-v{version}-linux-gnu-aarch64.tar.gz" }
+[[cargo_tools]]
+crate = "mcat"
+bins = ["mcat"]
+arm64 = "supported"
+binstall_format = "txz"
+binstall_bin_dir = "mcat-v{version}-{target}/mcat"
+binstall_urls = { amd64 = "https://github.com/Skardyy/mcat/releases/download/v{version}/mcat-v{version}-x86_64-unknown-linux-gnu.tar.xz", arm64 = "https://github.com/Skardyy/mcat/releases/download/v{version}/mcat-v{version}-aarch64-unknown-linux-gnu.tar.xz" }
+
+[python]
+installer = "https://astral.sh/uv/install.sh"
+channel = "cpython"
+[node]
+channel = "lts"
+[julia]
+installer = "https://install.julialang.org"
+channel = "release"
+
+[dotfiles]
+url = "https://github.com/Beren-Project/dotfiles-public.git"
+revision = "f7c3eb9ce433a1a8e285afdcda06c1da56c018fd"
+files = [".zshrc", ".zshenv", ".gitconfig", ".tmux.conf", ".config/starship.toml"]
+
+[ngspice]
+version = "47"
+url = "https://downloads.sourceforge.net/project/ngspice/ng-spice-rework/47/ngspice-47.tar.gz"
+sha256 = "894e649651f1838a14095e5a5439e7d3aa63e87ede14d283173fda4fcdef675f"
+configure = ["--with-x", "--enable-cider", "--disable-debug"]
+
+[openmodelica]
+url = "https://build.openmodelica.org/apt"
+key_url = "https://build.openmodelica.org/apt/openmodelica.asc"
+key_fingerprints = ["D229AF1CE5AED74E5F59DF303A59B53664970947", "5DE86CC050F6623BBA7995B864CE41328E03B30A"]
+channel = "stable"
+package = "omc"
+
+[nvim]
+repository = "neovim/neovim"
+channel = "stable"
+[nvim.archives]
+amd64 = "nvim-linux-x86_64.tar.gz"
+arm64 = "nvim-linux-arm64.tar.gz"
