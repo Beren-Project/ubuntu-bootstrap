@@ -61,6 +61,13 @@ only for a requested build profile or an actual dependency/source fallback.
 Cargo installations prefer upstream release binaries and fall back to locked
 source builds with automatically installed build prerequisites.
 
+Bootstrap also provisions Zsh completions from supported installed applications
+into user-owned `~/.zfunc`: rustup, Cargo (through rustup), uv, uvx, fnm, Starship,
+ripgrep, fd, bat, delta and mcat. Correct discoverable system completions take
+precedence; Ubuntu's gh completion and Zsh's Neovim completion stay system-owned.
+The existing dotfiles add `.zfunc` to `fpath` before `compinit`; no shell config
+or generated payload is copied into this project.
+
 | Optional flag | Installation |
 | --- | --- |
 | `--build` | build-essential, pkg-config, cmake, ninja-build |
@@ -116,6 +123,24 @@ retain diagnostic state and can be rerun. Interrupted/partial unmanaged paths
 require inspection rather than destructive cleanup. Previous system-asset trees
 are retained for recovery when replacing a working installation.
 
+Completions are regenerated when the installed generator's binary, reported
+version or generation command changes. Thus `--update` refreshes completions for
+changed tools and preserves current ones. Files are generated as the normal user
+into a temporary file, checked for a matching `#compdef` and valid Zsh syntax,
+then replaced atomically. A failed integration reports an error and returns
+nonzero while keeping the installed application and previous completion intact.
+Unmanaged, externally edited or symlinked completion files are preserved and
+reported for inspection; receipt loss does not authorize replacing them. Insecure
+directories writable by group/others are refused because `compinit -i` ignores
+them. After reviewing a conflicting generated artifact, move it aside before
+rerunning bootstrap; unrelated files in `.zfunc` are never removed.
+
+Eza and zoxide currently have no standalone runtime generator. Zoxide's existing
+shell integration and Juliaup's own completion location remain upstream-owned.
+Neovim uses Zsh's `_vim`; bottom, hyperfine and dust are not bootstrap-managed
+applications. No extra tools are installed to obtain completions. See the
+[verified completion interfaces](docs/UPSTREAM.md#zsh-completion-interfaces).
+
 ## Shared dotfiles
 
 Bootstrap consumes [Beren-Project/dotfiles-public](https://github.com/Beren-Project/dotfiles-public),
@@ -150,7 +175,8 @@ needed. Supply your own `user.name` and `user.email` before making commits.
 
 ## Testing
 
-No extra Python packages are required for the normal suite:
+No extra Python packages are required for the normal suite. Zsh must be installed
+for real completion syntax and autoload checks:
 
 ```sh
 ./scripts/test
@@ -173,7 +199,9 @@ Reused runs are not fresh-install qualification. Reports go to ignored
 
 The full scenario covers base installation, selective restore, ownership,
 Yes/No/non-interactive shell behavior, failures/recovery, optional profiles,
-repeat passes, explicit updates and an unrelated Cargo application. For a bounded
+repeat passes, generated completion ownership/compinit discovery, explicit updates
+and an unrelated Cargo application. `--scenario base` includes the focused
+completion failure/regeneration test. For a bounded
 debugging run use `--scenario base`, `engineering`, or `update`; the latter two
 expect an already prepared container via `--reuse`.
 

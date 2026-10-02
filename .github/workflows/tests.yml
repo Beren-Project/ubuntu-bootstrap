@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      - run: sudo apt-get update && sudo apt-get install -y zsh
       - run: ./scripts/test
   integration:
     if: github.event_name == 'workflow_dispatch' && inputs.integration

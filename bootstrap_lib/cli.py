@@ -13,7 +13,7 @@ import os
 import shutil
 import sys
 
-from . import apt, dotfiles, editors, julia, ngspice, node, openmodelica, python, rust, shell
+from . import apt, completions, dotfiles, editors, julia, ngspice, node, openmodelica, python, rust, shell
 from .config import OPTIONAL, load_manifest, resolve
 from .platform import BootstrapError, detect, invoking_user
 from .runtime import Context
@@ -103,6 +103,13 @@ def main(argv=None):
                     if name in config["defaults"]:
                         fatal = True
                         break
+                else:
+                    # The application remains installed if its completion integration fails.
+                    try:
+                        completions.provision(ctx, name)
+                    except (BootstrapError, OSError, ValueError) as error:
+                        ctx.status("ERROR", name + " completions", str(error))
+                        failed.add(name + " completions")
             login = None
             if not fatal:
                 try:

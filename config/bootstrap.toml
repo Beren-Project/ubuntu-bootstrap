@@ -149,3 +149,79 @@ channel = "stable"
 [nvim.archives]
 amd64 = "nvim-linux-x86_64.tar.gz"
 arm64 = "nvim-linux-arm64.tar.gz"
+
+# Stable generators only. Paths are absolute system paths or relative to HOME.
+# Correct discoverable system completions take precedence over generated copies.
+[[zsh_completions]]
+command = "gh"
+profile = "apt"
+owner = "apt"
+executable = "/usr/bin/gh"
+arguments = ["completion", "--shell", "zsh"]
+[[zsh_completions]]
+command = "rustup"
+profile = "rust"
+owner = "rust"
+executable = ".cargo/bin/rustup"
+arguments = ["completions", "zsh"]
+[[zsh_completions]]
+command = "cargo"
+profile = "rust"
+owner = "rust"
+executable = ".cargo/bin/rustup"
+version_executable = ".cargo/bin/cargo"
+arguments = ["completions", "zsh", "cargo"]
+[[zsh_completions]]
+command = "uv"
+profile = "python"
+owner = "uv"
+executable = ".local/bin/uv"
+arguments = ["generate-shell-completion", "zsh"]
+[[zsh_completions]]
+command = "uvx"
+profile = "python"
+owner = "uv"
+executable = ".local/bin/uvx"
+arguments = ["--generate-shell-completion", "zsh"]
+[[zsh_completions]]
+command = "fnm"
+profile = "cargo"
+owner = "fnm"
+executable = ".cargo/bin/fnm"
+arguments = ["completions", "--shell", "zsh"]
+[[zsh_completions]]
+command = "starship"
+profile = "cargo"
+owner = "starship"
+executable = ".cargo/bin/starship"
+arguments = ["completions", "zsh"]
+[[zsh_completions]]
+command = "rg"
+profile = "cargo"
+owner = "ripgrep"
+executable = ".cargo/bin/rg"
+arguments = ["--generate", "complete-zsh"]
+[[zsh_completions]]
+command = "fd"
+profile = "cargo"
+owner = "fd-find"
+executable = ".cargo/bin/fd"
+arguments = ["--gen-completions", "zsh"]
+[[zsh_completions]]
+command = "bat"
+profile = "cargo"
+owner = "bat"
+executable = ".cargo/bin/bat"
+arguments = ["--completion", "zsh"]
+[[zsh_completions]]
+command = "delta"
+profile = "cargo"
+owner = "git-delta"
+executable = ".cargo/bin/delta"
+arguments = ["--generate-completion", "zsh"]
+[[zsh_completions]]
+command = "mcat"
+profile = "cargo"
+owner = "mcat"
+executable = ".cargo/bin/mcat"
+arguments = ["--generate", "zsh"]

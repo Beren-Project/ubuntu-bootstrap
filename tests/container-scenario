@@ -28,6 +28,7 @@ if [[ "$scenario" == all || "$scenario" == base ]]; then
     /usr/bin/python3 -B /workspace/tests/container_checks.py repeat
     /usr/bin/python3 -B /workspace/tests/container_checks.py prompts
     /usr/bin/python3 -B /workspace/tests/container_checks.py failures
+    /usr/bin/python3 -B /workspace/tests/container_checks.py completion_update
 fi
 if [[ "$scenario" == all || "$scenario" == engineering ]]; then
     /workspace/bootstrap --non-interactive --no-change-shell --build --ngspice --openmodelica --vim --nvim --emacs --julia

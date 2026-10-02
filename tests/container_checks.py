@@ -30,7 +30,85 @@ def fingerprint():
             "files": {name: {"sha256": hashlib.sha256((HOME / name).read_bytes()).hexdigest(),
                               "mtime_ns": (HOME / name).stat().st_mtime_ns}
                       for name in CONFIG["dotfiles"]["files"]},
-            "backups": sorted(str(p.relative_to(HOME)) for p in (HOME / ".dotfiles-backups").rglob("*"))}
+            "backups": sorted(str(p.relative_to(HOME)) for p in (HOME / ".dotfiles-backups").rglob("*")),
+            "completions": {p.name: {"sha256": hashlib.sha256(p.read_bytes()).hexdigest(), "mtime_ns": p.stat().st_mtime_ns}
+                            for p in (HOME / ".zfunc").iterdir()}}
+
+
+def completions():
+    receipts = json.loads(RECEIPTS.read_text())
+    directory = HOME / ".zfunc"
+    assert directory.is_dir() and directory.stat().st_uid == os.getuid()
+    generated = []
+    for spec in CONFIG["zsh_completions"]:
+        command = spec["command"]
+        entry = receipts["completion:" + command]
+        path = Path(next(iter(entry["paths"])))
+        assert path.is_file() and path.stat().st_size, command
+        run("/usr/bin/zsh", "-n", str(path))
+        if entry["provider"] == "generated":
+            generated.append(command)
+            assert path == directory / ("_" + command)
+            assert path.stat().st_uid == os.getuid()
+            binary = Path(spec["executable"])
+            if not binary.is_absolute():
+                binary = HOME / binary
+            result = subprocess.run([str(binary), *spec["arguments"]], check=True, capture_output=True)
+            assert result.stdout == path.read_bytes(), command
+        else:
+            assert entry["provider"] == "system" and path.stat().st_uid == 0
+            assert not (directory / ("_" + command)).exists()
+    assert receipts["completion:gh"]["provider"] == "system"
+    assert set(p.name for p in directory.iterdir()) == {"_" + name for name in generated}
+    for name in ("eza", "zoxide", "nvim", "btm", "hyperfine", "dust"):
+        assert not (directory / ("_" + name)).exists()
+    script = '''[[ ${fpath[(Ie)$HOME/.zfunc]} -gt 0 ]] || exit 11
+for command in "$@"; do
+  [[ $_comps[$command] == _$command ]] || { print -u2 -- "missing compinit entry: $command"; exit 12; }
+  autoload +X -- _$command || exit 13
+done
+print -- "OK restored Zsh fpath, compinit registration and completion autoload"
+'''
+    output = run("/usr/bin/zsh", "-lic", script, "test", *generated, "gh")
+    assert "OK restored Zsh" in output
+    print("OK completions: user-owned nonempty version-matched generators, system gh, restored fpath/compinit")
+
+
+def completion_update():
+    from bootstrap_lib import completions as layer
+    from bootstrap_lib.runtime import Context
+    from bootstrap_lib.platform import BootstrapError
+    from types import SimpleNamespace
+    spec = next(s for s in CONFIG["zsh_completions"] if s["command"] == "fnm")
+    target = HOME / ".zfunc/_fnm"
+    before = target.read_bytes(), target.stat().st_mtime_ns
+    ctx = Context(CONFIG, SimpleNamespace(non_interactive=True, update=False, adopt=[]),
+                  pwd.getpwuid(os.getuid()), HOME, "amd64")
+    receipt = json.loads(RECEIPTS.read_text())["completion:fnm"]
+    try:
+        layer.provision_one(ctx, {**spec, "arguments": ["--intentionally-invalid-completion-option"]}, [])
+    except BootstrapError as error:
+        assert "generation failed" in str(error), error
+    else:
+        raise AssertionError("Invalid real fnm generation unexpectedly succeeded")
+    assert (target.read_bytes(), target.stat().st_mtime_ns) == before
+    assert json.loads(RECEIPTS.read_text())["completion:fnm"] == receipt
+    assert not list((HOME / ".zfunc").glob(".bootstrap-*"))
+    # A stale observation simulates a completion left over from a prior version.
+    # The actual application-version change is exercised by the offline unit fixture.
+    receipts = json.loads(RECEIPTS.read_text())
+    receipts["completion:fnm"]["source"]["version"] = "older observed fnm version (test fixture)"
+    RECEIPTS.write_text(json.dumps(receipts))
+    others = {p.name: p.stat().st_mtime_ns for p in (HOME / ".zfunc").iterdir() if p != target}
+    run(BOOTSTRAP, "--non-interactive", "--no-change-shell", "--update")
+    assert target.stat().st_mtime_ns != before[1]
+    after = json.loads(RECEIPTS.read_text())
+    for filename, mtime in others.items():
+        key = "completion:" + filename[1:]
+        if receipts[key]["source"] == after[key].get("source"):
+            assert (HOME / ".zfunc" / filename).stat().st_mtime_ns == mtime
+    completions()
+    print("OK real generator failure preserves working file; --update regenerates stale fnm and preserves current completions")
 
 
 def base():
@@ -70,6 +148,7 @@ def base():
     report = run("/usr/bin/python3", "-B", str(root / "scripts/check_dependencies.py"))
     assert "MISSING: zellij" in report
     run("/usr/bin/zsh", "-lic", "command -v cargo; command -v uv; command -v node; command -v delta")
+    completions()
     print("OK base: real installers, ownership, exact selective restore, pinned plugins, excluded files, No shell path")
 
 

@@ -22,6 +22,18 @@ def load_manifest():
     ):
         raise ValueError("Invalid dotfiles selection")
     resolve(config, config["profiles"])
+    names = set()
+    owners = {tool["crate"] for tool in config["cargo_tools"]} | {"apt", "rust", "uv"}
+    for spec in config["zsh_completions"]:
+        name = spec["command"]
+        if not re.fullmatch(r"[a-z][a-z0-9-]*", name) or name in names:
+            raise ValueError("Invalid/duplicate completion command")
+        names.add(name)
+        if spec["profile"] not in config["profiles"] or spec["owner"] not in owners:
+            raise ValueError("Unknown completion profile/owner")
+        for value in (spec["executable"], spec.get("version_executable", spec["executable"])):
+            if ".." in Path(value).parts:
+                raise ValueError("Unsafe completion executable path")
     return config
 
 

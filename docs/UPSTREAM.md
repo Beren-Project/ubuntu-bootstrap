@@ -37,3 +37,40 @@ reviewing this trust input, rather than accepting a newly downloaded key blindly
 The official resolute `omc` package currently declares compiler/build dependencies;
 these are APT dependencies, not a bootstrap build-profile edge. GUI recommendations
 and the `openmodelica` metapackage are not selected.
+
+## Zsh completion interfaces
+
+Inspected 2026-10-02 against official guidance/source and installed CLI help.
+Only application-provided stable generators are declared in `zsh_completions`
+in the manifest; no generated completion payload is stored here.
+
+| Command | Verified interface / authority |
+| --- | --- |
+| gh | [`gh completion --shell zsh`](https://cli.github.com/manual/gh_completion); prefer Ubuntu's discoverable `/usr/share/zsh/vendor-completions/_gh` |
+| rustup | [`rustup completions zsh`](https://rust-lang.github.io/rustup/installation/index.html#enable-tab-completion-for-bash-fish-zsh-or-powershell) |
+| cargo | `rustup completions zsh cargo`, verified by `rustup help completions`; upstream-generated loader uses the active toolchain's own `_cargo` |
+| uv / uvx | [`uv generate-shell-completion zsh` / `uvx --generate-shell-completion zsh`](https://docs.astral.sh/uv/getting-started/installation/#shell-autocompletion) |
+| fnm | [`fnm completions --shell zsh`](https://github.com/Schniz/fnm#completions) |
+| starship | `starship completions zsh`, verified by installed help and [official CLI source](https://github.com/starship/starship/blob/master/src/main.rs) |
+| rg | [`rg --generate complete-zsh`](https://github.com/BurntSushi/ripgrep/blob/master/FAQ.md#does-ripgrep-have-support-for-shell-auto-completion) |
+| fd | [`fd --gen-completions zsh`](https://github.com/sharkdp/fd#completions) |
+| bat | [`bat --completion zsh`](https://github.com/sharkdp/bat#from-source) |
+| delta | `delta --generate-completion zsh`, verified by installed help and [official completion definitions](https://github.com/dandavison/delta/blob/main/etc/completion/completion.zsh) |
+| mcat | `mcat --generate zsh`, verified by installed CLI help from the [official application](https://github.com/Skardyy/mcat) |
+
+Each generated file is named `_<command>` and must begin with an appropriate
+`#compdef`. This is the upstream autoload format, including Cargo's short loader;
+the installed Cargo version participates in regeneration even though rustup
+emits that loader. File receipts only record observed generator/version/hash and
+artifact ownership; the manifest selects desired generators.
+
+[Eza's official installation guidance](https://github.com/eza-community/eza/blob/main/INSTALL.md#completions)
+uses distributed static completion files, not an application runtime generator.
+[Zoxide's command definitions](https://github.com/ajeetdsouza/zoxide/blob/main/src/cmd/cmd.rs)
+expose shell initialization rather than a standalone completion command; its
+existing `zoxide init zsh` integration remains in dotfiles. Inspected cargo-binstall,
+cargo-update and Macchina help exposes no suitable generator. Juliaup keeps its
+official generated integration location. Zsh's system `_vim` declares `nvim`
+alongside Vim, so Neovim requires no fabricated or duplicate completion file.
+Bottom, hyperfine and dust are absent from the bootstrap tool manifest and are
+outside this completion change.

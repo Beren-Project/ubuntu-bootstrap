@@ -109,7 +109,76 @@ also repeated independently after runner cleanup.
   Interrupted publication requires inspection; bootstrap never deletes arbitrary
   existing installation trees to recover automatically.
 - GitHub Actions configuration is provided; its hosted execution has not run.
-- This supplied workspace has an empty read-only `.git` placeholder, so
-  `git status --short` reports `fatal: not a git repository`. Files were reviewed
-  directly and with `git diff --no-index --check`; no Git initialization, staging,
-  commit or push was performed.
+- During initial implementation this workspace had an empty read-only `.git`
+  placeholder, so Git status reported `fatal: not a git repository`. That initial
+  review used direct inspection and `git diff --no-index --check`, without Git
+  initialization, staging, commit or push by the implementation agent.
+
+## Completion follow-up — 2026-10-02
+
+Baseline: committed `ec3df7f` (`feat: add Ubuntu 26.04 development environment
+bootstrap`). The follow-up retains the existing modules/profile graph, package
+set, update policy and exact dotfiles SHA. It adds a completion module, manifest
+generator definitions and a small post-install hook; no dotfiles payloads or
+upstream restore behavior change.
+
+```sh
+./scripts/test
+./scripts/test-podman --scenario base --debug-retry
+git diff --check
+```
+
+The normal suite passes **51 tests**, including 16 new completion regressions,
+plus the existing static checks. Completion tests use real normal-user fixture
+applications, temporary files and Zsh syntax/autoload validation. They cover
+initial creation, ownership, secure permissions with permissive umask, unchanged
+reruns/updates, changed application versions, a Cargo-style unchanged proxy with
+a changed toolchain version, root refusal, unmanaged/symlink/insecure directory
+protection, empty/invalid/failed output, atomic preservation and optional
+integration failure reporting.
+
+Final review added a reproduced regression for exit-0 output containing only
+comments: this now fails validation before replacing a working file. The final
+strict format validator was also checked against all twelve actual supported
+generator outputs using normal-user temporary files on the host; it accepts
+the legitimate formats. Newly created `.zfunc` directories are explicitly 0755
+even with umask 002; preexisting insecure directories are preserved and refused.
+
+The focused **fresh Ubuntu 26.04 x86_64** Podman scenario passed with exit code 0
+in **233.28 seconds**. The debug-retry option was armed for safe debugging but no
+failure or retry occurred. The normal documented command without that option
+runs the identical scenario on success. It verified:
+
+- Eleven real generated files: `_rustup`, `_cargo`, `_uv`, `_uvx`, `_fnm`,
+  `_starship`, `_rg`, `_fd`, `_bat`, `_delta`, `_mcat`, all nonempty and user-owned.
+- Each generated file matches its installed application's current output and
+  passes `zsh -n`; the restored Zsh configuration includes `$HOME/.zfunc` in
+  `fpath`, registers generated commands through `compinit`, and autoloads them.
+- Ubuntu's `_gh` stays system-owned and is recognized without a `.zfunc` copy.
+  Eza/zoxide/Neovim/bottom/hyperfine/dust artifacts are not invented.
+- Base second pass preserves generated contents, modification times, receipt
+  observations, config files and backup inventory, with no duplicate/temp files.
+- A deliberately invalid invocation of the **real managed fnm** returns failure
+  without changing its working completion or receipt. A stale recorded version
+  then triggers regeneration through real `bootstrap --update`; current
+  completions retain their timestamps. Actual application version advancement
+  is covered separately by the controlled unit fixture, not falsely attributed
+  to a new upstream release during integration.
+- Existing root rejection, shell Yes/No and failure/recovery checks still pass.
+
+The session created just
+`c3c33ae97da3f375d70eb56171cd5da980b9fa04e8a0b6c2c9a50e60ff80daee`
+under the existing fixed project name, then removed it. Both inventory commands
+ran before creation and after cleanup and were repeated independently afterward.
+Before and after: **zero running**, **the same seven unrelated stopped**,
+**zero project test containers**. Unrelated IDs/names/states/exit codes were
+equal. No replacement containers or images were created and no global prune ran.
+Ignored `test-results/` now records this completion session's receipts/log/audit.
+
+This follow-up qualifies the completion layer and base path. The already-passed
+all-engineering baseline above was not reinstalled; optional application's
+completion failure behavior is covered by the focused unit orchestration test.
+ARM64 and live WSL terminal behavior retain the baseline's qualification limits.
+GitHub Actions now installs Zsh to run the real syntax/autoload unit checks; the
+hosted workflow has not been executed. No commit or push was performed for this
+follow-up.
