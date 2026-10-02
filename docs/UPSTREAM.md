@@ -1,7 +1,11 @@
 # Installation authorities and reviewed pins
 
-Reviewed 2026-10-01. Policies and immutable artifact inputs are centralized in
-`config/bootstrap.toml`; this document records why those methods were selected.
+Core installation authorities and pins were reviewed 2026-10-01; completion
+interfaces were inspected 2026-10-02. These are historical review dates, not a
+new live upstream audit. Policies and immutable artifact inputs are centralized
+in [config/bootstrap.toml](../config/bootstrap.toml); this document records why
+those methods were selected. Observed installation results and qualification
+limits are separate in [VALIDATION.md](VALIDATION.md).
 
 | Component | Official guidance | Implementation |
 | --- | --- | --- |
@@ -17,7 +21,10 @@ Reviewed 2026-10-01. Policies and immutable artifact inputs are centralized in
 
 Dotfiles commit `f7c3eb9ce433a1a8e285afdcda06c1da56c018fd` was inspected against
 its selective restore implementation and bootstrap contract. The selected paths
-are Zsh, Git, tmux and Starship only. Git identity remains personal state even
+are exactly `.zshrc`, `.zshenv`, `.gitconfig`, `.tmux.conf` and
+`.config/starship.toml`, using repeated upstream `--file` flags for preview/apply.
+The three-file upstream `--profile shell` preset is a separate interface.
+Git identity remains personal state even
 though upstream setup notes suggest creating it before restore; a missing
 `.gitconfig.local` is supported and bootstrap reports that account action.
 
@@ -34,7 +41,8 @@ The official OpenModelica key contains reviewed primary fingerprints
 `5DE86CC050F6623BBA7995B864CE41328E03B30A`. Signed Release metadata and APT
 package verification are both checked. A future upstream key change requires
 reviewing this trust input, rather than accepting a newly downloaded key blindly.
-The official resolute `omc` package currently declares compiler/build dependencies;
+The official resolute `omc` package inspected during the core review declared
+compiler/build dependencies;
 these are APT dependencies, not a bootstrap build-profile edge. GUI recommendations
 and the `openmodelica` metapackage are not selected.
 

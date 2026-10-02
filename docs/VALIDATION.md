@@ -1,6 +1,24 @@
 # Validation
 
-Validated locally on 2026-10-01. Installation qualification uses a fresh official
+This is a dated evidence index, not a promise that every scenario ran at the
+current revision. The implementation documented here is `f5e841a`; its core baseline and
+completion follow-up were subsequently committed by the user after the original
+implementation agents finished without committing or pushing.
+
+| Record | Code/evidence scope | Local suite | Real installation evidence |
+| --- | --- | --- | --- |
+| [Core qualification — 2026-10-01](#core-qualification--2026-10-01) | Original core implementation, subsequently committed as `ec3df7f` | 35 tests plus static checks | Fresh x86_64 Ubuntu 26.04, all profiles, 1000.62 s |
+| [Completion follow-up — 2026-10-02](#completion-follow-up--2026-10-02) | Completion implementation, subsequently committed as `f5e841a` | 51 tests plus static checks | Fresh x86_64 Ubuntu 26.04, focused base scenario, 233.28 s |
+| [Documentation follow-up — 2026-10-02](#documentation-follow-up--2026-10-02) | Documentation-only changes on `f5e841a`; implementation unchanged | 51 tests plus static and documentation checks | No installation run; earlier qualification unchanged |
+
+The focused completion run did not reinstall the all-profile engineering
+baseline. New documentation verification belongs in a separate dated record;
+it does not extend installation qualification. Contributor commands and
+resource discipline are described in [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+## Core qualification — 2026-10-01
+
+Validated locally on 2026-10-01. Installation qualification used a fresh official
 `docker.io/library/ubuntu:26.04` x86_64 container and a normal `engineer` user with
 an isolated HOME. No bootstrap installation was applied to the host's HOME.
 
@@ -17,7 +35,7 @@ tests execute real copy/rename commands to check successive replacements,
 retained predecessors, rollback and interrupted-publication refusal. These tests
 do not require network access or administrator privileges.
 
-## Real Ubuntu integration
+### Real Ubuntu integration
 
 The final `./scripts/test-podman` fresh-container scenario passed with exit code
 0 in 1000.62 seconds (approximately 17 minutes, including network fetches). It
@@ -58,7 +76,7 @@ managed CPython 3.14.7, Node 24.21.0 LTS, ngspice 47, OpenModelica
 1.27.1~2-g6db4671 and Neovim 0.12.5. These are test observations, not new pins.
 Immutable source/artifact checksums and desired channels remain in the manifest.
 
-## Podman resource audit
+### Podman resource audit
 
 Every session runs both `podman ps` and `podman ps -a` before creation and after
 cleanup. The fixed project name is `ubuntu-bootstrap-integration` with label
@@ -92,10 +110,11 @@ under the fixed project name, then removed it. Before/after unrelated container
 IDs, names, states and exit codes were equal. Both final inventory commands were
 also repeated independently after runner cleanup.
 
-## Limits
+### Qualification limits
 
-- Official OpenModelica **resolute** support was available and verified. Its CLI
-  package currently declares compiler dependencies itself; the bootstrap profile
+- Official OpenModelica **resolute** support was available and verified during
+  the core run. Its CLI package then declared compiler dependencies itself; the
+  bootstrap profile
   does not enable the generic build profile. GUI recommendations are excluded.
 - ARM64 mappings and decline/opt-in logic are unit tested; ARM64 installation is
   best effort and has not received real-machine qualification.
@@ -112,12 +131,15 @@ also repeated independently after runner cleanup.
 - During initial implementation this workspace had an empty read-only `.git`
   placeholder, so Git status reported `fatal: not a git repository`. That initial
   review used direct inspection and `git diff --no-index --check`, without Git
-  initialization, staging, commit or push by the implementation agent.
+  initialization, staging, commit or push by the implementation agent. The user
+  subsequently committed the core implementation as `ec3df7f`.
 
 ## Completion follow-up — 2026-10-02
 
 Baseline: committed `ec3df7f` (`feat: add Ubuntu 26.04 development environment
-bootstrap`). The follow-up retains the existing modules/profile graph, package
+bootstrap`). The user subsequently committed this follow-up as `f5e841a`
+(`feat: provision Zsh completions for bootstrap-managed tools`). The follow-up
+retains the existing modules/profile graph, package
 set, update policy and exact dotfiles SHA. It adds a completion module, manifest
 generator definitions and a small post-install hook; no dotfiles payloads or
 upstream restore behavior change.
@@ -180,5 +202,34 @@ all-engineering baseline above was not reinstalled; optional application's
 completion failure behavior is covered by the focused unit orchestration test.
 ARM64 and live WSL terminal behavior retain the baseline's qualification limits.
 GitHub Actions now installs Zsh to run the real syntax/autoload unit checks; the
-hosted workflow has not been executed. No commit or push was performed for this
-follow-up.
+hosted workflow had not been executed during this qualification. No commit or
+push was performed by the follow-up implementation agent; the user subsequently
+committed it as recorded above.
+
+## Documentation follow-up — 2026-10-02
+
+The approved documentation change adds detailed installation/usage/recovery,
+contributor and architecture guidance, shortens the README, and indexes the
+historical evidence. Two writers owned disjoint files and an independent
+read-only reviewer checked the combined result against the implementation.
+The [work plan and handoff](DOCS_WORK_PLAN.md) records assignments and outcomes.
+
+```sh
+./scripts/test
+git diff --check
+```
+
+The normal suite passed **51 tests** in 1.226 seconds, followed by manifest,
+Python AST, shell syntax and ShellCheck checks. A one-off standard-library
+documentation check verified local file links and heading anchors, manifest
+package/tool coverage, all public CLI flags, exact dotfiles SHA/selection and
+documentation-only changed paths. Command examples and ownership/failure claims
+were also reviewed against source rather than executed as installations.
+
+No runtime, manifest, workflow, test or dotfiles behavior changed. No bootstrap
+installation or Podman command ran for this change; no container was created,
+started, removed or otherwise managed. Historical inventories above are dated
+test evidence, not a new live Podman audit. No staging, commit or push was
+performed by this documentation implementation. External links and rendered
+GitHub pages were not browser-tested, and no new upstream availability audit,
+Ubuntu installation qualification or WSL runtime qualification is claimed.
