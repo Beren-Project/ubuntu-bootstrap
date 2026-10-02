@@ -38,7 +38,7 @@ Add regression coverage for changed behavior at the appropriate boundary, such
 as dependency resolution, external ownership, failed publication or generator
 output. Keep unrelated tools, configs and test resources intact.
 
-The current documentation change uses the
+The documentation follow-up is recorded in the
 [approved work plan and handoff](docs/DOCS_WORK_PLAN.md). It records contracts,
 file ownership, writer handoffs, independent review, checks and the stop boundary
 in one durable file. The coordinator integrates the writers' scoped changes;
@@ -62,11 +62,17 @@ and `tests`. [test_logic.py](tests/test_logic.py) covers profiles, ownership,
 downloads, dotfiles verification, system publication and shell consent.
 [test_completions.py](tests/test_completions.py) covers real fixture generators,
 Zsh loading, version changes, permissions, conflicts and failure preservation.
-For a focused iteration, select either file with unittest discovery, then run
+[test_optional_completions.py](tests/test_optional_completions.py) covers explicit
+provider classification, selected-only work, shared system functions, native
+Juliaup generation/channel registration, secure permissions and rollback after
+validation, receipt-write or publication-interrupt failures. The restored-shell
+probe observes startup registration without running a second `compinit`.
+For a focused iteration, select a file with unittest discovery, then run
 the full script before handoff:
 
 ```sh
 /usr/bin/python3 -B -m unittest discover -s tests -p 'test_completions.py' -v
+/usr/bin/python3 -B -m unittest discover -s tests -p 'test_optional_completions.py' -v
 ```
 
 Passing these checks does not establish fresh Ubuntu installation or live WSL
@@ -86,7 +92,7 @@ The default covers all scenarios:
 | Scenario | Scope and prerequisites |
 | --- | --- |
 | `--scenario base` | Base installation, second-pass preservation, shell Yes/No, ownership/recovery and generated completions |
-| `--scenario engineering` | All optional profiles and second-pass preservation; bootstrap also installs their default base |
+| `--scenario engineering` | All optional profiles, system/native completion registration, unavailable reporting, native failure/update preservation and second-pass checks; bootstrap also installs their default base |
 | `--scenario update` | Updates selected profiles while preserving an unrelated Cargo fixture; requires an already initialized managed base for fixture creation |
 | Default `all` | Runs base, engineering and update in order in one fresh container |
 
@@ -105,6 +111,8 @@ is never deleted by the runner. With no matching container, `--reuse` still
 creates a fresh one. Reuse and retries after a failure establish debugging
 evidence, not a new fresh-install qualification. `--debug-retry` permits an
 interactive retry in the same container; it does not create numbered replacements.
+When an `all` run resumes at `base` or `engineering`, a successful retry also
+finishes the remaining stages in that container, including update checks.
 Only container IDs created by that invocation are cleaned up. Do not substitute
 global prune, broad cleanup or removal of unrelated images/volumes.
 

@@ -48,6 +48,30 @@ and the `openmodelica` metapackage are not selected.
 
 ## Zsh completion interfaces
 
+The optional-provider follow-up is tracked in
+[OPTIONAL_COMPLETIONS_PLAN.md](OPTIONAL_COMPLETIONS_PLAN.md), including the
+confirmed Julia native destination. Optional package inspection uses full
+installed inventories and actual Zsh registration, not executable-name guesses.
+
+| Optional application/tool | Inspected authority and provider |
+| --- | --- |
+| Vim / Neovim | Zsh's official [`_vim`](https://github.com/zsh-users/zsh/blob/zsh-5.9/Completion/Unix/Command/_vim) declares both commands; Ubuntu `zsh-common` owns the installed provider |
+| GCC aliases / Make / pkg-config | Ubuntu `zsh-common` owns Zsh's `_gcc`, `_make`, `_pkg-config`; registration and aliases are verified rather than assuming `_COMMAND` |
+| Ninja | [Official Ninja Zsh completion](https://github.com/ninja-build/ninja/blob/master/misc/zsh-completion), packaged by Ubuntu `ninja-build` |
+| Binutils / Debian build tools | [GNU Binutils manual](https://sourceware.org/binutils/docs/binutils/) and [Debian build-package interface](https://manpages.debian.org/unstable/dpkg-dev/dpkg-buildpackage.1.en.html); inspected `zsh-common` supplies nm/objdump/ranlib/readelf/strings/strip/gprof and dpkg-buildpackage/dpkg-source; `dpkg-dev` supplies dpkg-parsechangelog |
+| Bison / Flex | Zsh's `_bison` and `_flex` from `zsh-common`, validated only when ngspice selects these source-build dependencies |
+| CMake / CTest / CPack | [Official CMake CLI documentation](https://cmake.org/cmake/help/latest/manual/cmake.1.html); inspected Ubuntu `cmake`/`cmake-data` ship Bash completions, with no supported application-specific Zsh provider found |
+| Emacs | [GNU command-line interface](https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Invocation.html) and Ubuntu `emacs-nox`, `emacs-common`, `emacs-bin-common` inventories; no supported application-specific Zsh provider found |
+| ngspice | [Official ngspice documentation](https://ngspice.sourceforge.io/docs.html), CLI help and pinned installation tree; no supported application-specific Zsh provider found |
+| OpenModelica | [Official compiler interface](https://openmodelica.org/doc/OpenModelicaUsersGuide/latest/omchelptext.html) and installed official `omc` package; no supported Zsh provider found |
+| Juliaup | `juliaup completions zsh`; official [`global_paths.rs`](https://github.com/JuliaLang/juliaup/blob/main/src/global_paths.rs) distinguishes the native depot home from binary/self home, and [`operations.rs`](https://github.com/JuliaLang/juliaup/blob/main/src/operations.rs) writes a sourced native script registering both `juliaup` and `julia +channel` |
+
+Missing providers are an explicit, nonfatal `unavailable` observation. A future
+trusted package provider can be discovered and qualified through installed
+inventories and `fpath`; no unofficial files or handwritten definitions are
+substituted. Pin-specific shell integration remains the responsibility of the
+reviewed [public dotfiles](https://github.com/Beren-Project/dotfiles-public/blob/f7c3eb9ce433a1a8e285afdcda06c1da56c018fd/home/.zshrc).
+
 Inspected 2026-10-02 against official guidance/source and installed CLI help.
 Only application-provided stable generators are declared in `zsh_completions`
 in the manifest; no generated completion payload is stored here.

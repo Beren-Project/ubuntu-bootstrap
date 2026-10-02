@@ -280,9 +280,40 @@ Supported commands are `gh`, `rustup`, `cargo`, `uv`, `uvx`, `fnm`, `starship`,
   bits; insecure directories are refused because `compinit -i` ignores them.
 
 Eza has no selected standalone runtime generator; zoxide retains its shell
-integration. Juliaup owns its own completion location. Neovim uses Zsh's `_vim`.
-No extra apps are installed for completions. See
+integration. Optional completion provisioning is conditional on profile
+selection. No extra apps are installed for completions.
+
+| Selected profile | Completion result |
+| --- | --- |
+| `--vim`, `--nvim` | Validate shared Ubuntu `_vim` and actual Zsh registration; no user duplicate |
+| `--julia` | Generate the official sourced integration at `~/.julia/juliaup/completions/zsh.zsh`; validate `juliaup` and `julia +channel` |
+| `--build` | Validate package-owned compiler/Make/pkg-config/Ninja, Binutils and Debian build providers; explicitly report inspected tools without a supported provider |
+| `--ngspice` | Validate selected build dependencies plus Bison/Flex; report application completion unavailable when none is qualified |
+| `--openmodelica`, `--emacs` | Inspect installed CLI packages and report application completion unavailable when none is qualified |
+
+Unavailable completion is a nonfatal `SKIP`; it does not mean the application
+failed installation. Unselected profiles prepare no artifacts; adding a profile
+on a later run prepares its declared integration then. System completion files
+remain package-owned. See the exact [provider mapping](OPTIONAL_COMPLETIONS_PLAN.md#inspected-provider-mapping) and
 [verified interfaces](UPSTREAM.md#zsh-completion-interfaces).
+
+Juliaup's native script is sourced by the pinned dotfiles after `compinit`; it
+does not use the `.zfunc/_COMMAND` autoload format. Unchanged valid output keeps
+its timestamp; an updated generator refreshes it atomically. Generation or final
+registration failure preserves a previous working file. Personal/unmanaged
+native scripts are preserved and refused; after reviewing the manager and script,
+explicit `--julia --adopt julia` also permits reconciliation of this integration.
+This exception does not adopt other `.zfunc` files. Custom `JULIAUP_DEPOT_PATH`
+values incompatible with the pinned native location are refused.
+
+Native scripts and existing parents writable by group/others are preserved and
+refused, including on ordinary reruns. Newly created native directories are 0755
+and generated scripts are 0644 even with a permissive umask. Publication and
+the paired native receipts roll back on caught failures/interruption before
+commit. After commit, later interruption or recovery-copy cleanup failure keeps
+the matching new script and receipts intact. If rollback
+itself fails, bootstrap reports the exact retained script/receipt backup path;
+inspect that recovery copy before making any manual repair.
 
 ## Paths and diagnostics
 
@@ -298,6 +329,7 @@ No extra apps are installed for completions. See
 | `~/.cargo`, `~/.rustup` | User Rust/Cargo tools and toolchains. |
 | `~/.local/bin` | uv/uvx, user Python launchers; optional ARM64 Neovim link. |
 | `~/.juliaup/bin` | Optional Julia launchers. |
+| `~/.julia/juliaup/completions/zsh.zsh` | Optional Juliaup native sourced completion, generated as the user. |
 | `~/.zfunc` | Generated user completions. |
 | `~/.dotfiles-backups` | Upstream restore backups. |
 | `~/.gitconfig.local` | Personal Git settings, outside restore selection. |
@@ -337,7 +369,7 @@ and shell choice; `--update` is not a generic repair switch.
 | Dirty/wrong-origin/pinned checkout | Exact managed checkout's status (including ignored/untracked files), origin and HEAD. | [Preserve the entire reviewed checkout, then refetch the pin](#recover-the-managed-dotfiles-checkout). |
 | Missing command/PATH integration | Expected inventory path, `command -v TOOL`, version, `.zshenv`/`.zshrc`; whether ARM64 dotfiles was declined. | Review startup and open a new Zsh login session; installers do not edit PATH. |
 | Shell-change failure | Original user's passwd entry, `/etc/shells`, sudo/PAM error. | Fix the specific problem; use the printed later `chsh` command if consent was deferred. |
-| Completion generation/conflict | Named `_COMMAND`, owner/type/mode, receipt and installed generator. | Correct generator failure, or preserve the exact reviewed conflicting file elsewhere before rerunning. No completion `--adopt` exists. |
+| Completion generation/conflict | Named artifact, owner/type/mode, receipt and installed generator. | Correct generator failure, or preserve the exact reviewed conflicting file elsewhere before rerunning. Base `.zfunc` files have no adoption flag; reviewed native Julia integration permits explicit `--julia --adopt julia`. |
 | Insecure completion directory | `.zfunc` ownership, symlinks and group/other write bits. | Make only the reviewed specific correction; avoid recursive permission changes or deleting the directory. |
 | Download/checksum/signature/APT candidate | Latest command/error and official source availability. | Correct connectivity/prerequisites, or ask maintainers to review changed upstream trust/interfaces. Keep verification enabled. |
 | Conflicting OpenModelica source | Exact managed and existing APT sources named in the error. | Review reconciliation; do not substitute an older Ubuntu suite. |

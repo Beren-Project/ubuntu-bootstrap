@@ -152,6 +152,176 @@ arm64 = "nvim-linux-arm64.tar.gz"
 
 # Stable generators only. Paths are absolute system paths or relative to HOME.
 # Correct discoverable system completions take precedence over generated copies.
+
+# Optional providers are explicit, including inspected tools with no supported
+# application-specific Zsh interface. System providers must be package-owned and
+# registered by the user's real Zsh configuration; nothing is copied to .zfunc.
+[[optional_zsh_completions]]
+profile = "julia"
+commands = ["juliaup", "julia"]
+provider = "upstream-managed"
+owner = "julia"
+executable = ".juliaup/bin/juliaup"
+arguments = ["completions", "zsh"]
+destination = ".julia/juliaup/completions/zsh.zsh"
+functions = ["_juliaup", "_julia_channel"]
+[[optional_zsh_completions]]
+profile = "vim"
+commands = ["vim"]
+provider = "system"
+function = "_vim"
+packages = ["zsh-common"]
+[[optional_zsh_completions]]
+profile = "nvim"
+commands = ["nvim"]
+provider = "system"
+function = "_vim"
+packages = ["zsh-common"]
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["gcc", "g++", "cc", "c++"]
+provider = "system"
+function = "_gcc"
+packages = ["zsh-common"]
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["make"]
+provider = "system"
+function = "_make"
+packages = ["zsh-common"]
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["pkg-config"]
+provider = "system"
+function = "_pkg-config"
+packages = ["zsh-common"]
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["ninja"]
+provider = "system"
+function = "_ninja"
+packages = ["ninja-build"]
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["cmake", "ctest", "cpack"]
+provider = "unavailable"
+reason = "Ubuntu CMake packages provide Bash completions; no supported Zsh generator/provider found."
+packages = ["cmake", "cmake-data", "zsh-common"]
+[[optional_zsh_completions]]
+profile = "emacs"
+commands = ["emacs"]
+provider = "unavailable"
+reason = "No application-specific Zsh provider in Ubuntu Emacs packages or official CLI."
+packages = ["emacs-nox", "emacs-common", "emacs-bin-common", "zsh-common"]
+[[optional_zsh_completions]]
+profile = "openmodelica"
+commands = ["omc"]
+provider = "unavailable"
+reason = "No supported Zsh provider in the official OpenModelica CLI package/interface."
+packages = ["omc", "zsh-common"]
+[[optional_zsh_completions]]
+profile = "ngspice"
+commands = ["ngspice"]
+provider = "unavailable"
+reason = "No supported Zsh provider in the pinned ngspice source installation/official CLI."
+packages = ["zsh-common"]
+artifact = "ngspice"
+
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["nm"]
+provider = "system"
+function = "_nm"
+packages = ["zsh-common"]
+
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["objdump"]
+provider = "system"
+function = "_objdump"
+packages = ["zsh-common"]
+
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["ranlib"]
+provider = "system"
+function = "_ranlib"
+packages = ["zsh-common"]
+
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["readelf"]
+provider = "system"
+function = "_readelf"
+packages = ["zsh-common"]
+
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["strings"]
+provider = "system"
+function = "_strings"
+packages = ["zsh-common"]
+
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["strip"]
+provider = "system"
+function = "_strip"
+packages = ["zsh-common"]
+
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["gprof"]
+provider = "system"
+function = "_gprof"
+packages = ["zsh-common"]
+
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["dpkg-buildpackage"]
+provider = "system"
+function = "_dpkg-buildpackage"
+packages = ["zsh-common"]
+
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["dpkg-source"]
+provider = "system"
+function = "_dpkg_source"
+packages = ["zsh-common"]
+
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["dpkg-parsechangelog"]
+provider = "system"
+function = "_dpkg-parsechangelog"
+packages = ["dpkg-dev"]
+
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["ar", "as", "ld", "objcopy", "size", "addr2line", "c++filt", "elfedit", "ld.bfd"]
+provider = "unavailable"
+reason = "No application-specific Zsh provider found for these GNU Binutils commands."
+packages = ["binutils", "binutils-common", "zsh-common"]
+[[optional_zsh_completions]]
+profile = "build"
+commands = ["cpp", "gcov", "gcov-tool", "gcov-dump"]
+provider = "unavailable"
+reason = "No application-specific Zsh provider found for these GCC auxiliary commands."
+packages = ["gcc", "cpp", "zsh-common"]
+[[optional_zsh_completions]]
+profile = "ngspice"
+commands = ["bison"]
+provider = "system"
+function = "_bison"
+packages = ["zsh-common"]
+[[optional_zsh_completions]]
+profile = "ngspice"
+commands = ["flex"]
+provider = "system"
+function = "_flex"
+packages = ["zsh-common"]
+
 [[zsh_completions]]
 command = "gh"
 profile = "apt"

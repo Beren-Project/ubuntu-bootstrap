@@ -1,6 +1,7 @@
 # Runtime architecture
 
-This describes the existing implementation at `f5e841a`. Desired state lives in
+This describes the existing bootstrap and focused optional-completion layer.
+Desired state lives in
 [config/bootstrap.toml](../config/bootstrap.toml); installation inventories and
 operator recovery live in [USAGE.md](USAGE.md). Review dated qualification in
 [VALIDATION.md](VALIDATION.md) before treating a supported mapping as tested
@@ -90,6 +91,7 @@ they are not the configuration authority.
 | [openmodelica.py](../bootstrap_lib/openmodelica.py) | Reviewed key fingerprints, signed Release metadata, managed resolute/stable source and CLI-only `omc` |
 | [dotfiles.py](../bootstrap_lib/dotfiles.py) | Pinned checkout, upstream plugins/selective restore and selected-config validation |
 | [completions.py](../bootstrap_lib/completions.py) | Post-handler application-provided Zsh completion integration |
+| [optional_completions.py](../bootstrap_lib/optional_completions.py) | Conditional package-provider registration, unavailable reporting and official Juliaup native integration |
 | [shell.py](../bootstrap_lib/shell.py) | Consent, original-user shell change, verification and interactive entry eligibility |
 
 ## Ownership and updates
@@ -101,7 +103,8 @@ or externally changed components are preserved and refused until explicitly
 reviewed and adopted with a supported `--adopt COMPONENT`. Adoption still
 requires valid types/owners and component-specific manager checks. Partial
 unmanaged installations are refused. Completion artifacts have their own
-strict receipt checks and no completion adoption flag.
+strict receipt checks. Base `.zfunc` artifacts have no adoption flag; a reviewed
+native Juliaup integration can be reconciled only with explicit `--adopt julia`.
 
 Ordinary reruns validate and preserve working owned tools. `--update` acts on
 the selected manifest-managed channels and APT package lists; optional profiles
@@ -154,10 +157,61 @@ unchanged valid output is reused, and changed sources trigger regeneration.
 Cargo additionally observes the active Cargo version because its rustup-generated
 loader can stay unchanged across toolchain updates. Failed/empty/invalid
 generation preserves a prior working file and its receipt. Restored dotfiles
-expose `.zfunc` through Zsh's `fpath`/`compinit`. Juliaup and existing shell
-initialization retain their own integrations; tools without a suitable declared
-runtime generator receive no invented completion files. See
+expose `.zfunc` through Zsh's `fpath`/`compinit`. Existing shell initialization
+retains its own integration; tools without a suitable declared runtime generator
+receive no invented completion files. See
 [upstream interfaces](UPSTREAM.md#zsh-completion-interfaces).
+
+`optional_zsh_completions` separately declares every optional profile, including
+system and explicitly unavailable providers. After the selected application's
+handler succeeds, package/artifact contents and actual restored Zsh registration
+are inspected. Shared functions such as `_vim` and `_gcc` are mapped explicitly;
+system candidates must be package-owned, root-owned, secure through all parents,
+and first in the effective `fpath`. Personal shadows are preserved and reported
+as conflicts. No system provider is copied to `.zfunc`. Unavailable providers
+produce a nonfatal status/receipt; generic file completion is not mislabeled as
+an application provider. A later qualified system provider can be recognized.
+
+The probe observes the restored shell's existing `_comps`; it does not run a
+second `compinit` that could repair missing startup registration during testing.
+The loading probe must use the same command/function/path selection whose
+package ownership was verified, and checks the actual function source. Base
+and optional command names share one duplicate-protection boundary.
+
+Package/artifact inventories remain duplicated per command for direct diagnostic
+inspection. The qualified all-profile snapshot is about 4.1 MiB. No correctness
+or measured performance problem justified changing this disposable representation;
+the manifest remains desired-state authority.
+
+For selected Julia, the owned `juliaup completions zsh` generator publishes the
+official sourced script at `~/.julia/juliaup/completions/zsh.zsh`, the exact
+location read by the pinned dotfiles. Native validation separately checks syntax,
+`juliaup` registration and the real `julia +channel` handler/candidates. The
+strict generic autoload validator is unchanged. The native script is generated
+as the user and staged beside its destination; failed generation preserves the
+old script, and failed final restored-shell validation rolls back publication
+while retaining its previous timestamp and receipts. Both native command
+observations are committed together before the recovery copy is discarded;
+receipt-write failures and caught rename interruptions restore previous state.
+Once both receipt observations commit, later interruptions or recovery-copy
+cleanup errors leave the matching new script and receipts intact.
+If restoration itself fails, the error identifies the retained recovery copy
+instead of deleting it. Existing native files and parents must be user-owned and
+not writable by group/others; only newly created directories get secure modes.
+Unchanged observed sources
+preserve valid files; changed generator versions/hashes/arguments refresh them.
+An upstream refresh is accepted automatically only when it matches the installed
+official generator exactly. Unmanaged or personal edits otherwise require review
+and explicit Julia adoption. No duplicate Julia `_tool` files or compatibility
+links are created. Incompatible custom Juliaup depots are refused.
+
+Build coverage includes compiler aliases, Make, pkg-config, CMake/CTest/CPack,
+Ninja, traditional Binutils commands and primary Debian package-build commands.
+Internal dpkg-dev plumbing, architecture-prefixed aliases and unrelated
+transitive utilities are outside this completion inventory. Bison/Flex providers
+are checked for selected ngspice. Selection, not incidental presence of compiler
+packages from a Cargo fallback, controls this work. Unselected profiles do no
+preparation; later selected profiles and updates run the same ownership checks.
 
 ## Privilege, failures and final shell
 

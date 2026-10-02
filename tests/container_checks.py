@@ -26,13 +26,149 @@ def run(*args, **kwargs):
 
 
 def fingerprint():
-    return {"receipts": json.loads(RECEIPTS.read_text()),
+    receipts = json.loads(RECEIPTS.read_text())
+    native_paths = {path for name, entry in receipts.items()
+                    if name.startswith("completion:") and entry.get("provider") == "upstream-managed"
+                    for path in entry["paths"]}
+    return {"receipts": receipts,
             "files": {name: {"sha256": hashlib.sha256((HOME / name).read_bytes()).hexdigest(),
                               "mtime_ns": (HOME / name).stat().st_mtime_ns}
                       for name in CONFIG["dotfiles"]["files"]},
             "backups": sorted(str(p.relative_to(HOME)) for p in (HOME / ".dotfiles-backups").rglob("*")),
             "completions": {p.name: {"sha256": hashlib.sha256(p.read_bytes()).hexdigest(), "mtime_ns": p.stat().st_mtime_ns}
-                            for p in (HOME / ".zfunc").iterdir()}}
+                            for p in (HOME / ".zfunc").iterdir()},
+            "upstream_completions": {path: {"sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+                                            "mtime_ns": Path(path).stat().st_mtime_ns}
+                                     for path in sorted(native_paths)}}
+
+
+def unselected_completions():
+    """Fresh base installation must not prepare any optional provider."""
+    receipts = json.loads(RECEIPTS.read_text())
+    for spec in CONFIG["optional_zsh_completions"]:
+        for command in spec["commands"]:
+            assert "completion:" + command not in receipts, command
+            assert not (HOME / ".zfunc" / ("_" + command)).exists(), command
+        if spec["provider"] == "upstream-managed":
+            assert not (HOME / spec["destination"]).exists(), spec["destination"]
+    print("OK unselected optional profiles: no receipts or generated completion artifacts")
+
+
+def optional_completions():
+    """Inspect real package/artifact contents and restored Zsh registration."""
+    receipts = json.loads(RECEIPTS.read_text())
+    system_arguments, unavailable = [], []
+    for spec in CONFIG["optional_zsh_completions"]:
+        inventory = {}
+        for package in spec.get("packages", []):
+            inventory[package] = run("/usr/bin/dpkg-query", "-L", package).splitlines()
+            assert inventory[package], package
+        if spec.get("artifact") == "ngspice":
+            prefix = Path("/opt/ubuntu-bootstrap") / ("ngspice-" + str(CONFIG["ngspice"]["version"]))
+            inventory["artifact:ngspice"] = [str(path) for path in prefix.rglob("*") if path.is_file()]
+            assert inventory["artifact:ngspice"], prefix
+        for command in spec["commands"]:
+            entry = receipts["completion:" + command]
+            assert entry["provider"] == spec["provider"], (command, entry)
+            assert not (HOME / ".zfunc" / ("_" + command)).exists(), command
+            if spec["provider"] == "system":
+                assert entry["function"] == spec["function"], command
+                assert len(entry["paths"]) == 1, entry
+                path = Path(next(iter(entry["paths"])))
+                assert path.is_file() and path.stat().st_uid == 0 and path.stat().st_size, path
+                assert any(str(path) in files for files in inventory.values()), (path, inventory.keys())
+                run("/usr/bin/zsh", "-n", str(path))
+                system_arguments.extend([command, spec["function"], str(path)])
+            elif spec["provider"] == "unavailable":
+                assert entry["reason"] and not entry["paths"], entry
+                observed = entry["inventory"]
+                assert set(inventory).issubset(observed), (command, observed.keys())
+                for key, files in inventory.items():
+                    assert set(files) == set(observed[key]), (command, key)
+                unavailable.append(command)
+            else:
+                assert spec["provider"] == "upstream-managed", spec
+                path = HOME / spec["destination"]
+                assert list(entry["paths"]) == [str(path)], entry
+                assert path.is_file() and path.stat().st_uid == os.getuid() and path.stat().st_size, path
+                run("/usr/bin/zsh", "-n", str(path))
+                binary = HOME / spec["executable"]
+                result = subprocess.run([str(binary), *spec["arguments"]], check=True, capture_output=True)
+                assert result.stdout == path.read_bytes(), command
+    script = '''zmodload zsh/parameter || exit 20
+typeset -A loaded
+while (( $# )); do
+  command=$1; function_name=$2; provider=$3; shift 3
+  [[ $_comps[$command] == $function_name ]] || { print -u2 -- "wrong provider: $command"; exit 21; }
+  if [[ -z ${loaded[$function_name]} ]]; then
+    autoload +X -- $function_name || exit 22
+    loaded[$function_name]=yes
+  fi
+  [[ ${functions_source[$function_name]} == $provider ]] || { print -u2 -- "shadowed provider: $command"; exit 23; }
+done
+print -- "OK selected system completion registration"
+'''
+    assert "OK selected system" in run("/usr/bin/zsh", "-lic", script, "test", *system_arguments)
+    unavailable_script = '''for command in "$@"; do
+  [[ -z $_comps[$command] || $_comps[$command] == _files || $_comps[$command] == _default ]] || {
+    print -u2 -- "new provider needs qualification: $command -> $_comps[$command]"; exit 24
+  }
+done
+print -- "OK unavailable completion status agrees with restored Zsh"
+'''
+    assert "OK unavailable" in run("/usr/bin/zsh", "-lic", unavailable_script, "test", *unavailable)
+    # Exercise the official sourced integration in the actual restored shell.
+    # Only compadd/_default are intercepted: Juliaup supplies the real channels.
+    julia_script = '''[[ $_comps[juliaup] == _juliaup && $_comps[julia] == _julia_channel ]] || exit 25
+(( $+functions[_juliaup] && $+functions[_julia_channel] )) || exit 26
+typeset -a observed
+compadd() { [[ $1 == -a && $2 == channels ]] || return 1; observed=("${channels[@]}"); }
+PREFIX=+rel; IPREFIX=''
+_julia_channel || exit 27
+[[ $PREFIX == rel && $IPREFIX == + && ${observed[(Ie)release]} -gt 0 ]] || exit 28
+typeset default_called=no
+_default() { default_called=yes; }
+PREFIX=ordinary_argument
+_julia_channel || exit 29
+[[ $default_called == yes ]] || exit 30
+print -- "OK Juliaup registration and real julia +channel completion"
+'''
+    assert "OK Juliaup registration" in run("/usr/bin/zsh", "-lic", julia_script, "test")
+    completions()
+    print("OK selected optional providers: package-owned aliases, honest unavailable inventory, native Juliaup integration")
+
+
+def optional_completion_update():
+    """Use the real native generator to test atomic failure and stale refresh."""
+    from bootstrap_lib import optional_completions as layer
+    from bootstrap_lib.runtime import Context
+    from bootstrap_lib.platform import BootstrapError
+    from types import SimpleNamespace
+    spec = next(s for s in CONFIG["optional_zsh_completions"] if s["provider"] == "upstream-managed")
+    target = HOME / spec["destination"]
+    before = target.read_bytes(), target.stat().st_mtime_ns
+    receipts_before = json.loads(RECEIPTS.read_text())
+    ctx = Context(CONFIG, SimpleNamespace(non_interactive=True, update=True, adopt=[]),
+                  pwd.getpwuid(os.getuid()), HOME, "amd64")
+    try:
+        layer.provision_upstream(ctx, {**spec, "arguments": ["completions", "invalid-test-shell"]})
+    except BootstrapError as error:
+        assert "generation failed" in str(error).lower(), error
+    else:
+        raise AssertionError("Invalid real Juliaup completion generation unexpectedly succeeded")
+    assert (target.read_bytes(), target.stat().st_mtime_ns) == before
+    assert json.loads(RECEIPTS.read_text()) == receipts_before
+    assert not list(target.parent.glob(".bootstrap-*"))
+    for command in spec["commands"]:
+        ctx.receipts["completion:" + command]["source"]["version"] = "older observed Juliaup version (test fixture)"
+    ctx.write_state("receipts.json", ctx.receipts)
+    layer.provision_upstream(ctx, spec)
+    assert target.read_bytes() == before[0] and target.stat().st_mtime_ns != before[1]
+    refreshed = target.stat().st_mtime_ns
+    layer.provision_upstream(ctx, spec)
+    assert target.stat().st_mtime_ns == refreshed
+    optional_completions()
+    print("OK real Juliaup failure preserves native script; stale --update refresh and current rerun are atomic/idempotent")
 
 
 def completions():
@@ -265,6 +401,8 @@ def engineering():
     run("/usr/bin/vim", "--version")
     run("/usr/bin/emacs", "--batch", "-Q", "--eval", "(princ (+ 1 1))")
     assert run(str(HOME / ".juliaup/bin/julia"), "-e", "print(1+1)") == "2"
+    optional_completions()
+    optional_completion_update()
     print("OK build, ngspice numerical smoke, GUI-free OpenModelica simulation, all editors, Julia")
 
 
@@ -286,6 +424,7 @@ def update():
     assert run(str(binary)) == "unrelated-user-tool 0.1.0"
     assert "unrelated-user-tool" not in json.loads(RECEIPTS.read_text())
     run("sha256sum", "--check", str(HOME / "excluded.sha256"))
+    optional_completions()
     print("OK --update left unrelated Cargo application and excluded/personal configs untouched")
 
 

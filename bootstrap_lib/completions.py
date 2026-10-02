@@ -115,6 +115,8 @@ def provision_one(ctx, spec, fpath):
 
 def provision(ctx, profile):
     normal_user(ctx)
+    from . import optional_completions
+    optional_completions.provision(ctx, profile)
     specs = [spec for spec in ctx.config["zsh_completions"] if spec["profile"] == profile]
     if not specs:
         return

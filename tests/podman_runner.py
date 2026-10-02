@@ -81,7 +81,17 @@ def main():
                          "--user", "engineer", "--workdir", "/workspace", NAME,
                          "bash", "/workspace/tests/container-scenario", scenario, freshness, check=False)
             exit_code = result.returncode
-            if not exit_code or not args.debug_retry:
+            if not exit_code:
+                # An all-scenario debugging retry may resume at the failed
+                # stage. Finish remaining stages in this same container so
+                # retrying engineering cannot silently omit update coverage.
+                if args.scenario == "all" and scenario in ("base", "engineering"):
+                    scenario = "engineering" if scenario == "base" else "update"
+                    freshness = "reused"
+                    print(f"VERIFY retry passed; continuing remaining {scenario} stage in SAME container", flush=True)
+                    continue
+                break
+            if not args.debug_retry:
                 break
             scenario = input("DEBUG failure inspected; retry SAME container (all/base/engineering/update), or Enter to clean up: ").strip()
             if scenario not in ("all", "base", "engineering", "update"):

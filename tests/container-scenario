@@ -22,6 +22,9 @@ if [[ "$scenario" == all || "$scenario" == base ]]; then
     fi
     grep -q 'normal user' "$HOME/root-rejection.log"
     /workspace/bootstrap --non-interactive --no-change-shell
+    if [[ "$freshness" == fresh ]]; then
+        /usr/bin/python3 -B /workspace/tests/container_checks.py unselected_completions
+    fi
     /usr/bin/python3 -B /workspace/tests/container_checks.py base
     /usr/bin/python3 -B /workspace/tests/container_checks.py snapshot
     /workspace/bootstrap --non-interactive --no-change-shell

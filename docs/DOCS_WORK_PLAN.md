@@ -39,7 +39,7 @@ able to trace ownership and failure boundaries and choose the correct tests.
 
 | Role | Owned files | Status |
 | --- | --- | --- |
-| Coordinator | This work plan; final integration edits after writers finish | Complete; awaiting user review |
+| Coordinator | This work plan; final integration edits after writers finish | Complete; handed off for user review |
 | User-documentation writer | `README.md`, `docs/USAGE.md` | Complete; integrated |
 | Maintainer-documentation writer | `CONTRIBUTING.md`, `docs/ARCHITECTURE.md`, `docs/UPSTREAM.md`, `docs/VALIDATION.md` | Complete; integrated |
 | Independent reviewer | Read-only review of combined documentation and source | Complete; no findings requiring correction |
@@ -100,8 +100,10 @@ performed. Existing Ubuntu/WSL qualification limits remain unchanged.
 
 The original documentation pass and approved fresh-reader follow-up are
 complete. English documentation; concise README and linked detailed guides;
-inspect before recovery and avoid broad cleanup/adoption. Await user review of
-the uncommitted diff. Do not stage, commit or push without explicit instruction.
+inspect before recovery and avoid broad cleanup/adoption. At the documentation
+handoff, the agent left the uncommitted diff for user review without staging,
+committing or pushing. The user subsequently committed that documentation as
+`0883eed`; the dated evidence below describes the earlier implementation phase.
 
 ## Approved fresh-reader follow-up — 2026-10-02
 
@@ -124,7 +126,7 @@ The normal suite already passed; these prose/example corrections do not change
 the behavior it tests. Coordinator will check the focused diff, local
 links/anchors, shell example syntax, whitespace and unchanged implementation.
 
-Status: complete; awaiting user review. The new correction writer changed only
+Status at handoff: complete and submitted for user review. The correction writer changed only
 `README.md` and `docs/USAGE.md`. Coordinator reviewed the focused changes against
 the original snapshot and the absent-checkout fetch/verification implementation;
 the other four public documents remain unchanged. The README warning now

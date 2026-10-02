@@ -34,7 +34,39 @@ def load_manifest():
         for value in (spec["executable"], spec.get("version_executable", spec["executable"])):
             if ".." in Path(value).parts:
                 raise ValueError("Unsafe completion executable path")
+    validate_optional_completions(config)
     return config
+
+
+def validate_optional_completions(config):
+    if {spec["profile"] for spec in config["optional_zsh_completions"]} != set(OPTIONAL):
+        raise ValueError("Every optional profile must declare its completion provider")
+    names = {spec["command"] for spec in config["zsh_completions"]}
+    for spec in config["optional_zsh_completions"]:
+        if spec["profile"] not in OPTIONAL or not spec["commands"]:
+            raise ValueError("Invalid optional completion profile/commands")
+        for command in spec["commands"]:
+            if not re.fullmatch(r"[a-z][a-z0-9+.-]*", command) or command in names:
+                raise ValueError("Invalid/duplicate optional completion command")
+            names.add(command)
+        provider = spec["provider"]
+        if provider not in ("system", "upstream-managed", "unavailable"):
+            raise ValueError("Unknown optional completion provider")
+        if provider == "system" and not re.fullmatch(r"_[a-z][a-z0-9_-]*", spec.get("function", "")):
+            raise ValueError("Invalid optional system completion function")
+        if provider in ("system", "unavailable") and not spec.get("packages"):
+            raise ValueError("Optional provider needs package inventory")
+        if provider == "unavailable" and not spec.get("reason"):
+            raise ValueError("Unavailable completion needs an explicit reason")
+        if provider == "upstream-managed":
+            if spec["profile"] != "julia" or spec.get("owner") != "julia":
+                raise ValueError("Unknown upstream-managed completion owner")
+            for key in ("destination", "executable"):
+                value = Path(spec[key])
+                if value.is_absolute() or ".." in value.parts or not value.parts:
+                    raise ValueError("Unsafe upstream completion path")
+            if spec["commands"] != ["juliaup", "julia"] or spec["functions"] != ["_juliaup", "_julia_channel"]:
+                raise ValueError("Invalid Juliaup native registration contract")
 
 
 def resolve(config, requested):

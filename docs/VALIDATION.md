@@ -233,3 +233,213 @@ test evidence, not a new live Podman audit. No staging, commit or push was
 performed by this documentation implementation. External links and rendered
 GitHub pages were not browser-tested, and no new upstream availability audit,
 Ubuntu installation qualification or WSL runtime qualification is claimed.
+
+## Optional completion follow-up — 2026-10-02
+
+Baseline: `0883eed`. The focused follow-up adds explicit optional-provider
+metadata, a separate optional completion module and conditional post-handler
+integration. Existing package sets, profile dependencies, manager/channel
+policy, base autoload contract and pinned five-file restore remain unchanged.
+The approved native Julia script destination is
+`~/.julia/juliaup/completions/zsh.zsh`, matching the pinned dotfiles; no
+compatibility link, dotfiles payload change or duplicate Julia `.zfunc` file
+was needed. See the [provider mapping and handoff](OPTIONAL_COMPLETIONS_PLAN.md).
+
+```sh
+./scripts/test
+./scripts/test-podman --scenario all --debug-retry
+git diff --check
+```
+
+The normal suite passed **72 tests** in **14.946 seconds**, followed by manifest,
+Python AST, shell syntax and ShellCheck validation. Twenty-one optional-provider
+tests exercise classification, selected-only execution, shared functions,
+already-loaded valid system functions, personal shadows, generic fallback,
+native Julia registration/channel behavior, changed versions, root refusal,
+custom-depot refusal, ownership, atomic generation and rollback after final
+restored-shell validation failure. Local documentation links/anchors and four
+standalone embedded Zsh scripts were also checked. Independent read-only review
+found no remaining blocker after its concrete findings were corrected.
+
+The final **fresh Ubuntu 26.04 x86_64** full Podman scenario passed with exit 0
+in **593.25 seconds**, without a retry. It verified:
+
+- Fresh base installation prepares no optional receipts/completion artifacts,
+  even when compiler packages exist because a Cargo fallback required them.
+- Later-selected profiles validate **21 system registrations**, including
+  Vim/Neovim's shared `_vim`, compiler aliases, Make, pkg-config, Ninja,
+  traditional Binutils, primary Debian build commands and Bison/Flex.
+  Actual restored Zsh `compinit` registration, autoload source and root package
+  ownership are checked; no duplicate `.zfunc` files are created.
+- **19 commands** record explicit `unavailable` status after inspecting full
+  package/artifact inventories. These include CMake/CTest/CPack, selected
+  Binutils/GCC helpers, Emacs, ngspice and OpenModelica. Generic file completion
+  is not claimed as application-specific support; absence is nonfatal.
+- Juliaup **1.22.7** generates the real official native script as the normal
+  user. Its installed output matches the published file exactly. Restored Zsh
+  recognizes both `juliaup` and the real `julia +channel` handler, including
+  channel candidates and ordinary-argument fallback.
+- A deliberately invalid invocation of the real Juliaup generator fails
+  without changing the existing file, timestamp or receipts, and leaves no
+  staging files. A stale observed version triggers atomic refresh; the next
+  unchanged run preserves its timestamp. Actual version advancement is covered
+  by the offline fixture, rather than claiming a new upstream release occurred.
+- Base/all-profile second passes preserve completion hashes/timestamps,
+  receipts, selected config files and backup inventory. Ngspice is not rebuilt.
+  Full `--update` revalidates providers and preserves the unrelated Cargo fixture
+  and excluded/personal configs. Existing root, shell Yes/No, exact checkout,
+  plugin, numerical engineering/editor and failure/recovery checks also pass.
+
+Dotfiles revision tested remains:
+
+```text
+f7c3eb9ce433a1a8e285afdcda06c1da56c018fd
+```
+
+### Resource evidence
+
+An earlier development session reused its same fixed-name container after a
+test failure while the manifest/path decision was being completed; it passed
+base and engineering checks and cleaned up. It created/removed only
+`8ff0c6d9b0e6040d63c8cecc76898f7a0eb088ce25ca455ea6d46ebda1d5f4e2`.
+Its audit was preserved at `/tmp/ubuntu-bootstrap-optional-development-audit.json`.
+The final fresh qualification then created/removed only
+`994ceb94682f5139220d58b39b54c43071b34b5d5c6d3438643d55d4c6e2e5ba`.
+Both used `ubuntu-bootstrap-integration`, the existing label, normal test user,
+cached fixed Ubuntu image and finally-style cleanup; no numbered debugging
+replacement or uniquely tagged image was created.
+
+Both inventory commands ran before creation and after cleanup in each session,
+and were independently repeated afterward. Final before/after unrelated IDs,
+names, states and exit codes match: **zero running**, **the same seven unrelated
+stopped**, **zero project test containers**. Only session-created resources were
+removed; no global prune or unrelated container/image/volume deletion occurred.
+The approximately 112 MB Ubuntu image remains cached. Ignored `test-results/`
+contains the final receipts, last-run status, bootstrap log and full session audit.
+
+### Limits and final handoff
+
+This is Ubuntu integration evidence; ARM64 and live WSL terminal/Wayland behavior
+retain the earlier qualification limits. OpenModelica's signed **resolute** CLI
+repository/package worked; no GUI packages or generic build-profile implication
+were added. Internal dpkg-dev plumbing, architecture-prefixed aliases and unrelated
+transitive utilities are outside this completion inventory. Missing supported
+providers are reported honestly; no custom definitions or extra apps are added.
+The hosted Actions workflow was not executed. During this initial optional-layer
+implementation phase, the agent did not stage, commit or push; the implementation
+and documentation were handed off for user review.
+
+## Optional-completion precommit review — 2026-10-02
+
+The independent source review covered the tracked diff and all three untracked
+implementation/handoff/test files. Previous passing results were treated as
+historical evidence, not proof that the new transaction and registration paths
+were correct. Concrete reproductions required these corrections:
+
+- The login-shell probe ran another `compinit`, masking missing registration
+  in actual startup. It now observes existing `_comps` without repairing it.
+- Provider discovery and loading used separate shells without binding the
+  second shell to the previously verified paths. A changing `fpath` could load
+  a personal provider while receipts described the trusted first selection.
+  Loading now checks the saved command/function/path selection before autoload
+  and verifies the actual function source afterward. Native Julia functions
+  must also come from the exact sourced script rather than a personal override.
+- An existing writable native script was accepted on rerun; newly created
+  parents could also inherit unsafe permissions from umask 002. Existing
+  insecure files/parents are preserved and refused before child creation;
+  only new directories receive 0755 and generated files receive 0644.
+- Native recovery ended before the paired receipt writes. Receipt failure or
+  an interrupt immediately after rename could leave changed files and old
+  observations. Both native observations now publish together within recovery;
+  precommit failures restore the file and in-memory/on-disk receipts. Once
+  receipts commit, an interrupt or recovery-copy cleanup error keeps the
+  matching new script and receipts instead of rolling back the file alone.
+  If restoration itself fails, the named recovery copy is retained.
+- Diagnostic state publication leaked its staging file on serialization/rename
+  failure. The shared helper now cleans its exact staging path in `finally`.
+- Duplicate protection did not span base and optional command tables, permitting
+  an optional entry to overwrite a base receipt. Both tables share that check.
+- Handoff wording permanently describing pending review/no commits was scoped
+  to the dated implementation phases. The old counts and qualification records
+  remain historical evidence; they were not replaced with the new results.
+
+The package/artifact inventory representation is deliberately unchanged.
+Duplicating inventory across command receipts makes direct diagnostic inspection
+simple; the all-profile snapshot is about 4.1 MiB, with no demonstrated
+correctness or performance problem that justifies a refactor. System providers
+still validate in place, unavailable providers remain nonfatal, and no extra
+applications, handwritten completions, dotfiles changes or Julia compatibility
+links were introduced.
+
+```sh
+./scripts/test
+./scripts/test-podman --scenario all --debug-retry
+git diff --check
+```
+
+The final local suite passed **87 tests** in **28.714 seconds**, plus manifest,
+Python AST, shell syntax and available ShellCheck checks. The 36 optional-provider
+tests include 15 new regressions/checks for the review findings, explicit Julia
+adoption, publication/receipt interruption boundaries, retained recovery copies
+and normal-user filesystem permissions. These execute real Zsh and fixture
+applications; controlled faults exercise failure paths that a successful network
+installation would not demonstrate. A separate real-Zsh probe confirmed that
+autoloading a symlink reports the selected logical provider path.
+
+The first review integration run passed all fresh-container scenarios in
+791.42 seconds and cleaned its only container,
+`a339c2486c944f5776d5efa5e2c23ef99c197db59083d01d31bd663084743f7e`.
+The final transaction-edge fix was completed while that session ran, so a
+separate final qualification was started with runtime, manifest and test hashes
+frozen. Its results and resource audit follow.
+
+### Final qualification and resources
+
+The final **fresh Ubuntu 26.04 x86_64** full scenario passed with exit 0 in
+**637.13 seconds**, without a retry. Runtime, manifest and test hashes still
+matched their pre-run snapshot afterward. The run verified fresh base isolation,
+later-selected optional profiles, the actual restored Zsh environment,
+generation/failure preservation, stale-source refresh, unchanged reruns and
+full `--update` ownership. All engineering numerical/editor smoke checks,
+shell consent paths and existing conflict recovery checks passed. The final
+last-run failure list is empty.
+
+There are **21 optional system registrations**, **19 optional unavailable
+observations** and **two native Julia observations**. Including base providers,
+the receipts contain 11 generated, 22 system, 19 unavailable and two native
+entries. Juliaup 1.22.7 generated the installed native script; both native
+commands refer to that same version/hash/arguments and validated file. The
+receipt snapshot is 4.129 MiB. Dotfiles remain at the exact tested revision
+`f7c3eb9ce433a1a8e285afdcda06c1da56c018fd` and the unchanged five-file selection.
+
+Final qualification created and removed only
+`19feaf72e5faa7be9aef273311048ab74c358755449e049f6eaf57b01a32a663`.
+Both review sessions used the same predictable name and labels sequentially;
+the first container was already removed before final qualification began.
+There was no appropriate existing project container to reuse and no numbered
+debugging replacement. Both `podman ps` and `podman ps -a` ran before creation
+and after cleanup, and were independently repeated after each session.
+Before and after: **zero running**, **the same seven unrelated stopped**,
+**zero project test containers**. Unrelated IDs/names/states/exit codes match.
+No unrelated container, image or volume was deleted and no global prune ran.
+
+The fixed official `ubuntu:26.04` tag advanced between pulls; the older
+preexisting approximately 112 MB cached image is now untagged and was preserved.
+No custom or uniquely tagged image was built. Image inventories were inspected
+after both sessions. Ignored `test-results/` contains final logs/receipts/audit;
+the first review audit was preserved separately at
+`/tmp/ubuntu-bootstrap-review-first-podman-session.json`.
+
+Final `git diff --check` and local Markdown links/anchors/whitespace checks
+passed, including inspection of the untracked files. The initial no-Git handoff
+wording now describes implementation history and remains correct after a future
+user commit. This review performed no staging, commit, push or host bootstrap
+application.
+
+Qualification remains Ubuntu-container evidence: ARM64, live WSL terminal/
+Wayland behavior and hosted Actions were not tested. Rollback covers caught
+exceptions/interrupts; abrupt process termination or power loss is not a durable
+transaction guarantee and can leave staging/recovery files for inspection.
+If the filesystem prevents restoration or cleanup, bootstrap reports the named
+recovery path instead of deleting the only recovery copy. No redesign into a
+persistent transaction journal was introduced.

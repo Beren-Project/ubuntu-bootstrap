@@ -110,6 +110,10 @@ previous completion while returning nonzero. See the
 [completion lifecycle](docs/USAGE.md#zsh-completions) and
 [task-based recovery](docs/USAGE.md#troubleshooting-by-task).
 
+Selected optional profiles validate their declared system providers or prepare
+Juliaup's native integration. Tools without a supported provider report
+`unavailable` without failing installation; no completion definitions are invented.
+
 ## Documentation and validation
 
 - [Usage](docs/USAGE.md): detailed inventory, flags, paths, updates and recovery.

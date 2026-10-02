@@ -119,11 +119,16 @@ class Context:
         destination = self.state / name
         if destination.parent != self.state or destination.is_symlink():
             raise BootstrapError(f"Refusing unsafe diagnostic state path: {destination}")
-        with tempfile.NamedTemporaryFile(mode="w", dir=self.state, delete=False) as stream:
-            json.dump(value, stream, indent=2, sort_keys=True)
-            stream.write("\n")
-            staged = Path(stream.name)
-        staged.replace(destination)
+        staged = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", dir=self.state, delete=False) as stream:
+                staged = Path(stream.name)
+                json.dump(value, stream, indent=2, sort_keys=True)
+                stream.write("\n")
+            staged.replace(destination)
+        finally:
+            if staged:
+                staged.unlink(missing_ok=True)
 
     def owned(self, name, paths, *, system=False):
         paths = list(map(Path, paths))
