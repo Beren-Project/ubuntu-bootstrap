@@ -1,5 +1,9 @@
 # Optional completion follow-up
 
+Historical implementation plan for the optional-provider baseline. Current
+Cargo ownership, shared inventories and durable publication are described in
+[the 2026-10-03 maintenance design](MAINTENANCE_2026-10-03.md).
+
 Baseline: `0883eed`. Scope is explicit optional-provider metadata, conditional
 post-install checks, official Juliaup integration, tests and related docs.
 The existing package/profile graph, managers, updates and pinned five-file

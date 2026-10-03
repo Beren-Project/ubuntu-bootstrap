@@ -192,8 +192,9 @@ class NativeJuliaCompletionTests(ProviderEnvironment):
     def setUp(self):
         super().setUp()
         self.spec = {"profile": "julia", "commands": ["juliaup", "julia"], "functions": ["_juliaup", "_julia_channel"],
-                     "provider": "upstream-managed", "owner": "julia", "executable": ".juliaup/bin/juliaup",
+                     "provider": "upstream-managed", "owner": "juliaup", "executable": ".cargo/bin/juliaup",
                      "destination": ".native/completions/zsh.zsh", "arguments": ["completions", "zsh"]}
+        self.ctx.config["optional_zsh_completions"][0] = self.spec
         self.binary = self.home / self.spec["executable"]
         self.destination = self.home / self.spec["destination"]
         self.binary.parent.mkdir(parents=True)
@@ -233,7 +234,7 @@ else:
     sys.exit({7 if failure else 0})
 ''')
         self.binary.chmod(0o755)
-        self.ctx.record("julia", [self.binary], manager="juliaup")
+        self.ctx.record("juliaup", [self.binary], manager="cargo")
 
     def provision(self):
         providers.provision_upstream(self.ctx, self.spec)
@@ -408,9 +409,12 @@ else:
         self.application(version=2)
         receipts = self.ctx.receipts_path.read_bytes()
         replace = Path.replace
+        fired = False
         def interrupted(path, target):
+            nonlocal fired
             result = replace(path, target)
-            if path.name.startswith(".bootstrap-") and not path.name.startswith(".bootstrap-previous-") and target == self.destination:
+            if path.name.startswith(".bootstrap-") and not path.name.startswith(".bootstrap-previous-") and target == self.destination and not fired:
+                fired = True
                 raise KeyboardInterrupt("interrupt immediately after rename")
             return result
         with patch.object(Path, "replace", interrupted):
@@ -421,57 +425,63 @@ else:
         self.assertEqual(list(self.destination.parent.iterdir()), [self.destination])
 
     def test_interrupt_after_completed_receipts_keeps_file_and_receipts_consistent(self):
+        from bootstrap_lib.durability import Transaction
         self.provision()
         self.application(version=2)
-        record = providers.record_native
-        def interrupted(*args):
-            record(*args)
-            raise KeyboardInterrupt("interrupt after native receipts committed")
-        with patch.object(providers, "record_native", side_effect=interrupted):
+        cleanup = Transaction.cleanup
+        fired = False
+        def interrupted(tx):
+            nonlocal fired
+            if tx.load()["phase"] == "COMMITTED" and not fired:
+                fired = True
+                raise KeyboardInterrupt("after durable commit")
+            cleanup(tx)
+        with patch.object(Transaction, "cleanup", interrupted):
             with self.assertRaises(KeyboardInterrupt):
                 self.provision()
         receipt = self.ctx.receipts["completion:juliaup"]
         self.assertEqual(receipt["paths"][str(self.destination)], digest(self.destination))
         self.assertEqual(receipt["source"]["version"], "juliaup fixture 2")
         self.assertEqual(json.loads(self.ctx.receipts_path.read_text()), self.ctx.receipts)
-        self.assertEqual(list(self.destination.parent.iterdir()), [self.destination])
+        self.assertFalse((self.ctx.state / "transaction").exists())
 
     def test_receipt_backup_cleanup_failure_keeps_committed_pair_consistent(self):
         self.provision()
         self.application(version=2)
         unlink = Path.unlink
         def fail_cleanup(path, *args, **kwargs):
-            if path.name.startswith(".bootstrap-receipts-"):
+            if path.name == "old-state":
                 raise OSError("recovery-copy cleanup unavailable")
             return unlink(path, *args, **kwargs)
         with patch.object(Path, "unlink", fail_cleanup):
-            with self.assertRaisesRegex(BootstrapError, "recovery-copy cleanup failed at"):
+            with self.assertRaisesRegex(BootstrapError, "material preserved at"):
                 self.provision()
         receipt = self.ctx.receipts["completion:juliaup"]
         self.assertEqual(receipt["paths"][str(self.destination)], digest(self.destination))
-        self.assertEqual(receipt["source"]["version"], "juliaup fixture 2")
         self.assertEqual(json.loads(self.ctx.receipts_path.read_text()), self.ctx.receipts)
-        backups = list(self.ctx.state.glob(".bootstrap-receipts-*"))
-        self.assertEqual(len(backups), 1)
-        self.assertEqual(json.loads(backups[0].read_text())["completion:juliaup"]["source"]["version"], "juliaup fixture 1")
-        self.assertEqual(list(self.destination.parent.iterdir()), [self.destination])
+        backup = self.ctx.state / "transaction/old-state"
+        self.assertEqual(json.loads(backup.read_text())["completion:juliaup"]["source"]["version"], "juliaup fixture 1")
+        self.ctx.initialize_state()
+        self.assertFalse(backup.parent.exists())
 
     def test_failed_rollback_keeps_recovery_backup(self):
+        from bootstrap_lib.durability import Transaction
         self.provision()
         before = self.destination.read_bytes()
         self.application(version=2)
-        replace = Path.replace
-        def failed_restore(path, target):
-            if path.name.startswith(".bootstrap-previous-"):
+        restore = Transaction.restore
+        def failed_restore(tx, target, backup, expected):
+            if backup.name == "old-artifact":
                 raise OSError("restore unavailable")
-            return replace(path, target)
-        with patch.object(Path, "replace", failed_restore), patch.object(providers, "verify_native_registration", side_effect=BootstrapError("registration failed")):
-            with self.assertRaisesRegex(BootstrapError, "previous script preserved at"):
+            return restore(tx, target, backup, expected)
+        with patch.object(Transaction, "restore", failed_restore), patch.object(providers, "verify_native_registration", side_effect=BootstrapError("registration failed")):
+            with self.assertRaisesRegex(BootstrapError, "material preserved at"):
                 self.provision()
-        backups = list(self.destination.parent.glob(".bootstrap-previous-*"))
-        self.assertEqual(len(backups), 1)
-        self.assertEqual(backups[0].read_bytes(), before)
-        self.assertFalse(list(self.destination.parent.glob(".bootstrap-receipts-*")))
+        backup = self.ctx.state / "transaction/old-artifact"
+        self.assertEqual(backup.read_bytes(), before)
+        self.ctx.initialize_state()
+        self.assertEqual(self.destination.read_bytes(), before)
+        self.assertFalse(backup.parent.exists())
 
     def test_failed_state_publication_cleans_staging_file(self):
         state = self.ctx.state / "probe.json"

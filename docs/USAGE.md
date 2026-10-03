@@ -87,7 +87,7 @@ automatic prerequisites if the binary attempt cannot complete.
 
 | Tool/package | Command(s) | Purpose | Installer/owner |
 | --- | --- | --- | --- |
-| rustup | `rustup` | Rust toolchain management. | Official rustup installer; `rust` profile. |
+| rustup | `rustup` | Rust toolchain management. | Verified official rustup-init binary; `rust` profile. |
 | Rust stable/minimal | `rustc`, `cargo` | Compiler and package/build manager. | rustup; `rust` profile. |
 | cargo-binstall | `cargo-binstall` (`cargo binstall`) | Binary-first Cargo application installer. | Verified official archive; `cargo` profile. |
 | cargo-update | `cargo-install-update`, `cargo-install-update-config` | Cargo update utilities; bootstrap updates through explicit binstall operations. | Cargo; `cargo` profile; ARM64 unqualified. |
@@ -101,11 +101,11 @@ automatic prerequisites if the binary attempt cannot complete.
 | zoxide | `zoxide` | Shell directory navigation. | Cargo; `cargo` profile. |
 | macchina | `macchina` | System information display. | Cargo; `cargo` profile. |
 | mcat | `mcat` | Terminal content viewer. | Cargo; `cargo` profile. |
-| uv | `~/.local/bin/uv`, `~/.local/bin/uvx` | Python environment/package tools and interpreter installation. | Official uv installer; `python` profile; receipt owner `uv`. |
+| uv | `~/.cargo/bin/uv`, `~/.cargo/bin/uvx` | Python environment/package tools and interpreter installation. | Cargo via binstall/source fallback; `python` profile; receipt owner `uv`. |
 | Managed CPython | `~/.local/bin/python`, `~/.local/bin/python3` | Stable user development interpreter launchers. | uv; `python` profile; receipt owner `python`. |
 | Node LTS | `node` in the fnm-selected environment | JavaScript runtime and managed LTS default. | fnm; `node` profile. |
 | Shared dotfiles | Configuration files | Configure Zsh, Git, tmux and Starship. | Pinned upstream `restore.py`; `dotfiles` profile. |
-| Standalone Zsh plugins | Shell integrations | Shared shell plugin integrations. | Pinned upstream `install_zsh_plugins.py`; [exact revision's plugin inventory](https://github.com/Beren-Project/dotfiles-public/blob/f7c3eb9ce433a1a8e285afdcda06c1da56c018fd/scripts/zsh-plugins.json). |
+| Standalone Zsh plugins | Shell integrations | Shared shell plugin integrations. | Pinned upstream `install_zsh_plugins.py`; [exact revision's plugin inventory](https://github.com/Beren-Project/dotfiles-public/blob/c44e4b8c8299f2b05ee225678daead77bf5bfbd1/scripts/zsh-plugins.json). |
 
 System Python is never the pip development environment. Project dependencies
 and environments remain user actions. Versions are channels, not new pins:
@@ -118,8 +118,8 @@ observed versions/hashes; immutable dotfiles/ngspice choices live in the
 
 | Selection | Package/tool | Command | Purpose | Installer/owner |
 | --- | --- | --- | --- | --- |
-| `--julia` | Juliaup | `~/.juliaup/bin/juliaup` | Manage Julia release channel. | Official Juliaup installer. |
-| `--julia` | Julia | `~/.juliaup/bin/julia` | Technical/numerical computing. | Juliaup `release` channel. |
+| `--julia` | Juliaup | `~/.cargo/bin/juliaup` | Manage Julia release channel. | Cargo via binstall/source fallback. |
+| `--julia` | Julia | `~/.cargo/bin/julia` | Technical/numerical computing. | Cargo-owned launcher; Juliaup owns runtime/`release` channel. |
 | `--ngspice` | ngspice 47 | `ngspice` | SPICE circuit simulation. | Verified pinned source; user build/staging, system publication. |
 | `--openmodelica` | omc | `/usr/bin/omc` | OpenModelica modeling/simulation CLI. | Signed official `resolute`/stable APT repository, no GUI recommendations. |
 | `--vim` | vim | `vim` | Terminal editor. | Ubuntu APT. |
@@ -166,7 +166,7 @@ channel.
 
 ## Shared configuration and reruns
 
-Dotfiles revision **`f7c3eb9ce433a1a8e285afdcda06c1da56c018fd`** supplies only:
+Dotfiles revision **`c44e4b8c8299f2b05ee225678daead77bf5bfbd1`** supplies only:
 
 ```text
 .zshrc
@@ -247,7 +247,7 @@ do not advance with updates.
 
 Unmanaged tools and external replacements are preserved and reported. Inspect
 origin, path, owner and manager metadata before adopting. Accepted names are
-`rust`, `cargo-binstall`, `uv`, `python`, `node`, `julia`, `nvim`, `ngspice`, plus
+`rust`, `cargo-binstall`, `uv`, `python`, `node`, `juliaup`, `julia`, `nvim`, `ngspice`, plus
 the eleven manifest crates: `cargo-update`, `starship`, `bat`, `eza`, `fd-find`,
 `fnm`, `git-delta`, `ripgrep`, `zoxide`, `macchina`, `mcat`. Use crate names,
 not aliases such as `fd`. Optional adoption still needs selection, for example
@@ -327,8 +327,9 @@ inspect that recovery copy before making any manual repair.
 | Same state directory: `receipts.json` | Ownership/version/hash observations. |
 | Same state directory: `lock` | Process-held nonblocking run lock. |
 | `~/.cargo`, `~/.rustup` | User Rust/Cargo tools and toolchains. |
-| `~/.local/bin` | uv/uvx, user Python launchers; optional ARM64 Neovim link. |
-| `~/.juliaup/bin` | Optional Julia launchers. |
+| `~/.local/bin` | User Python launchers; optional ARM64 Neovim link. |
+| `~/.cargo/bin` | Cargo applications, including uv/uvx and optional Juliaup/julia. |
+| `~/.juliaup` | Legacy remaining files are preserved after exact launcher migration. |
 | `~/.julia/juliaup/completions/zsh.zsh` | Optional Juliaup native sourced completion, generated as the user. |
 | `~/.zfunc` | Generated user completions. |
 | `~/.dotfiles-backups` | Upstream restore backups. |
@@ -385,12 +386,12 @@ ownership changes or blanket adoption as recovery steps.
 
 With no bootstrap run active, inspect the exact machine-managed checkout named
 in the error as your normal user. This applies only to
-`${XDG_DATA_HOME:-$HOME/.local/share}/ubuntu-bootstrap/dotfiles/f7c3eb9ce433a1a8e285afdcda06c1da56c018fd`,
+`${XDG_DATA_HOME:-$HOME/.local/share}/ubuntu-bootstrap/dotfiles/c44e4b8c8299f2b05ee225678daead77bf5bfbd1`,
 not a development clone or a checkout under `zsh/plugins`. Review that path
 before using the example:
 
 ```sh
-bootstrap_checkout="${XDG_DATA_HOME:-$HOME/.local/share}/ubuntu-bootstrap/dotfiles/f7c3eb9ce433a1a8e285afdcda06c1da56c018fd"
+bootstrap_checkout="${XDG_DATA_HOME:-$HOME/.local/share}/ubuntu-bootstrap/dotfiles/c44e4b8c8299f2b05ee225678daead77bf5bfbd1"
 ls -ld "$bootstrap_checkout"
 git -C "$bootstrap_checkout" remote get-url origin
 git -C "$bootstrap_checkout" rev-parse HEAD
@@ -399,7 +400,7 @@ git -C "$bootstrap_checkout" ls-files -v
 ```
 
 Expected origin is `https://github.com/Beren-Project/dotfiles-public.git` and
-expected HEAD is `f7c3eb9ce433a1a8e285afdcda06c1da56c018fd`. Status must include
+expected HEAD is `c44e4b8c8299f2b05ee225678daead77bf5bfbd1`. Status must include
 ignored files; lowercase tags or `S` in `ls-files -v` indicate index flags that
 can hide changes. Preserve these findings for review. If the path is a symlink
 or is not an ordinary checkout, investigate that specific error before moving it.
@@ -432,3 +433,28 @@ environments. Check [dated qualification limits](VALIDATION.md) before treating
 container evidence as live WSL qualification. For contributor checks and source
 changes, see [CONTRIBUTING.md](../CONTRIBUTING.md),
 [architecture](ARCHITECTURE.md) and [upstream notes](UPSTREAM.md).
+
+## Cargo-owned Python and Julia managers
+
+Cargo owns uv/uvx and Juliaup/julia in `~/.cargo/bin`; uv owns managed CPython,
+and Juliaup owns the Julia `release` channel in the existing depot. `--update`
+updates the selected manager crate through cargo-binstall/locked source fallback
+first, then the managed runtime. Bootstrap does not call either manager's binary
+self-update command. Python/Julia prerequisites do not select the Cargo CLI
+collection, although the normal default selection still includes that collection.
+
+Verified baseline receipts migrate automatically after replacement validation.
+Only unchanged, proven `.local/bin/uv`, `.local/bin/uvx`, `.juliaup/bin/juliaup`
+and `.juliaup/bin/julia` launchers are retired. The supported legacy Julia symlink
+is removed as a link; its unreceipted `julialauncher` target is preserved. Changed,
+unmanaged or unsafe launchers are retained and cause a clear failure, including
+when adoption flags are supplied. Python environments and Julia data/channels
+remain intact. `--adopt juliaup` separately covers reviewed Cargo manager adoption;
+`--adopt julia` retains its runtime/native-completion meaning.
+
+The state directory's `transaction/` contains a journal and required recovery
+material during coupled publication. Startup reconciles it before ownership
+checks. Before completion commit it restores prior artifacts/receipts; verified
+launcher retirement rolls forward. If recovery fails, preserve the reported
+material for inspection. An interrupted Cargo install before durable replacement
+evidence is not automatically adopted. See [the state machines and limits](MAINTENANCE_2026-10-03.md).

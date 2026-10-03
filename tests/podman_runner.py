@@ -104,6 +104,7 @@ def main():
             for filename in ("receipts.json", "last-run.json", "bootstrap.log"):
                 run("cp", f"{NAME}:/home/engineer/.local/state/ubuntu-bootstrap/{filename}",
                     str(report_dir / filename), check=False)
+            run("cp", f"{NAME}:/home/engineer/inventory-size.json", str(report_dir / "inventory-size.json"), check=False)
         # Cleanup only IDs created by this invocation; never borrowed/unrelated containers.
         for identifier in created:
             run("rm", "--force", "--time", "0", identifier, check=False)

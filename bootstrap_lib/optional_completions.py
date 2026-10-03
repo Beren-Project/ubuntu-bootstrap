@@ -5,13 +5,14 @@ The manifest defines providers; receipts only record verified observations.
 """
 from pathlib import Path
 import shlex
-import shutil
 import subprocess
 import tempfile
 
 from .completions import normal_user, validate
 from .platform import BootstrapError
 from .runtime import digest, safe_directory
+from .durability import RecoveryError, Transaction, fsync_directory
+from .inventories import normalize
 
 
 def zsh_probe(ctx, commands, *, load=False, expected=None, sourced=None):
@@ -194,51 +195,29 @@ def native_directory(ctx, path):
     directory = safe_directory(path)
     for parent in missing:
         parent.chmod(0o755)
+        fsync_directory(parent)
     return directory
 
 
-def record_native(ctx, spec, destination, source):
-    """Publish both native observations together, restoring state on failure."""
-    normal_user(ctx)
-    prior = ctx.receipts
-    proposed = dict(prior)
-    paths = {str(destination): digest(destination)}
+def native_receipts(ctx, spec, destination, source, checksum):
+    proposed = dict(ctx.receipts)
     for command, function in zip(spec["commands"], spec["functions"]):
-        proposed["completion:" + command] = {"paths": paths, "provider": "upstream-managed",
-                                             "function": function, "source": source}
-    if proposed == prior:
-        return
-    backup = None
-    attempted = keep_backup = False
-    try:
-        with tempfile.NamedTemporaryFile(prefix=".bootstrap-receipts-", dir=ctx.state, delete=False) as stream:
-            backup = Path(stream.name)
-        shutil.copy2(ctx.receipts_path, backup)
-        attempted = True
+        proposed["completion:" + command] = {"paths": {str(destination): checksum},
+            "provider": "upstream-managed", "function": function, "source": source}
+    return normalize(proposed)
+
+
+def record_native(ctx, spec, destination, source):
+    proposed = native_receipts(ctx, spec, destination, source, digest(destination))
+    if proposed != ctx.receipts:
         ctx.write_state("receipts.json", proposed)
         ctx.receipts = proposed
-    except BaseException:
-        ctx.receipts = prior
-        if attempted:
-            try:
-                backup.replace(ctx.receipts_path)
-            except OSError as error:
-                keep_backup = True
-                raise BootstrapError(f"Native receipt rollback failed; prior receipts preserved at {backup}: {error}") from error
-        raise
-    finally:
-        if backup and not keep_backup:
-            try:
-                backup.unlink(missing_ok=True)
-            except OSError as error:
-                raise BootstrapError(f"Native receipt recovery-copy cleanup failed at {backup}: {error}") from error
 
 
 def provision_upstream(ctx, spec):
     normal_user(ctx)
-    depot = ctx.env.get("JULIAUP_DEPOT_PATH")
-    if depot and (not Path(depot).is_absolute() or Path(depot) != ctx.home / ".julia"):
-        raise BootstrapError("Custom JULIAUP_DEPOT_PATH conflicts with the pinned dotfiles' native integration; existing state preserved")
+    from .julia import validate_depot
+    validate_depot(ctx)
     binary = ctx.home / spec["executable"]
     if spec["owner"] not in ctx.receipts:
         raise BootstrapError("Juliaup completion requires the selected, bootstrap-managed Julia installation")
@@ -252,7 +231,7 @@ def provision_upstream(ctx, spec):
             raise BootstrapError(f"Refusing non-user-owned regular Juliaup completion: {destination}")
         if destination.stat().st_mode & 0o022:
             raise BootstrapError(f"Insecure Juliaup completion file preserved: {destination}; remove group/other write permissions after review")
-        if not receipt and spec["owner"] not in ctx.args.adopt:
+        if not receipt and spec["profile"] not in ctx.args.adopt:
             raise BootstrapError(f"Unmanaged Juliaup completion preserved: {destination}; review before explicitly --adopt julia")
     directory = native_directory(ctx, destination.parent)
     source = {"executable": str(binary), "sha256": digest(binary),
@@ -264,10 +243,7 @@ def provision_upstream(ctx, spec):
         record_native(ctx, spec, destination, source)
         ctx.status("FOUND", "completion juliaup/julia", str(destination))
         return
-    temporary = previous = None
-    receipts_before = ctx.receipts
-    published = False
-    keep_previous = False
+    temporary = None
     try:
         with tempfile.NamedTemporaryFile(prefix=".bootstrap-", dir=directory, delete=False) as stream:
             temporary = Path(stream.name)
@@ -281,46 +257,18 @@ def provision_upstream(ctx, spec):
             if result.returncode:
                 raise BootstrapError(f"Juliaup completion generation failed (exit {result.returncode}); existing file preserved")
         validate_native(ctx, temporary)
-        if exists and not unchanged and spec["owner"] not in ctx.args.adopt:
-            # Accept an upstream refresh only when byte-for-byte official output.
-            # Any personal alteration is preserved, even if syntactically valid.
+        if exists and not unchanged and spec["profile"] not in ctx.args.adopt:
             if destination.read_bytes() != temporary.read_bytes():
                 raise BootstrapError(f"Externally changed Juliaup completion preserved: {destination}")
-        if exists:
-            with tempfile.NamedTemporaryFile(prefix=".bootstrap-previous-", dir=directory, delete=False) as saved:
-                previous = Path(saved.name)
-            shutil.copy2(destination, previous)
         temporary.chmod(0o644)
-        temporary.replace(destination)
-        published = True
-        verify_native_registration(ctx, spec)
-        record_native(ctx, spec, destination, source)
-    except BaseException as error:
-        # Publication must also survive actual restored-shell validation failure
-        # or interruption without sacrificing the prior working native script.
-        # An interrupt can arrive after rename succeeds but before Python sets
-        # published. The vanished staging path also proves rename completed.
-        # record_native replaces the receipt dictionary only after recording
-        # both observations successfully. After that commit, keep the matching
-        # script on interruption or cleanup error rather than rolling it back
-        # alone. Before commit, restore the previous file as usual.
-        if ctx.receipts is receipts_before and (published or (temporary is not None and not temporary.exists())):
-            if previous:
-                try:
-                    previous.replace(destination)
-                except OSError as recovery_error:
-                    keep_previous = True
-                    raise BootstrapError(f"Native completion rollback failed; previous script preserved at {previous}: {recovery_error}") from recovery_error
-            else:
-                destination.unlink(missing_ok=True)
-        if isinstance(error, subprocess.TimeoutExpired):
-            raise BootstrapError("Juliaup completion generation timed out; existing file preserved") from error
-        raise
+        proposed = native_receipts(ctx, spec, destination, source, digest(temporary))
+        Transaction(ctx).publish_completion(destination, temporary, proposed,
+                                            lambda: verify_native_registration(ctx, spec))
+    except subprocess.TimeoutExpired as error:
+        raise BootstrapError("Juliaup completion generation timed out; existing file preserved") from error
     finally:
         if temporary:
             temporary.unlink(missing_ok=True)
-        if previous and not keep_previous:
-            previous.unlink(missing_ok=True)
     ctx.status("UPDATE" if exists else "INSTALL", "completion juliaup/julia", str(destination))
 
 
@@ -343,6 +291,8 @@ def provision(ctx, profile):
             else:
                 provision_system(ctx, spec)
         except (BootstrapError, OSError, ValueError) as error:
+            if isinstance(error, RecoveryError) or ctx.state_failed:
+                raise
             errors.append(f"{', '.join(spec['commands'])}: {error}")
     if errors:
         raise BootstrapError("; ".join(errors))

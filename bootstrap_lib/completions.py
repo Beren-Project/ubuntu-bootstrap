@@ -7,6 +7,8 @@ import tempfile
 
 from .platform import BootstrapError
 from .runtime import digest, safe_directory
+from .durability import RecoveryError, Transaction, fsync_directory
+from .inventories import normalize
 
 
 def normal_user(ctx):
@@ -47,6 +49,7 @@ def completion_directory(ctx):
     directory = safe_directory(path)
     if not existing:
         directory.chmod(0o755)  # newly generated state must be safe even with a permissive umask
+        fsync_directory(directory)
     if directory.stat().st_mode & 0o022:
         raise BootstrapError(f"Completion directory is writable by group/others; Zsh would ignore it: {directory}")
     return directory
@@ -69,8 +72,10 @@ def provision_one(ctx, spec, fpath):
     system = system_completion(ctx, command, fpath)
     if system:
         if exists:
-            destination.unlink()  # only an unchanged, receipt-verified generated artifact
-        ctx.record(name, [system], provider="system")
+            proposed = normalize({**ctx.receipts, name: {"paths": {str(system): digest(system)}, "provider": "system"}})
+            Transaction(ctx).publish_completion(destination, None, proposed, lambda: None)
+        else:
+            ctx.record(name, [system], provider="system")
         ctx.status("FOUND", "completion " + command, f"system: {system}")
         return
     binary = executable(ctx, spec["executable"])
@@ -103,13 +108,14 @@ def provision_one(ctx, spec, fpath):
                 raise BootstrapError(f"Completion generation failed for {command} (exit {result.returncode}); existing file preserved. See {ctx.log_path}")
         validate(ctx, temporary, command)
         temporary.chmod(0o644)
-        temporary.replace(destination)
+        proposed = normalize({**ctx.receipts, name: {"paths": {str(destination): digest(temporary)},
+                              "provider": "generated", "source": source}})
+        Transaction(ctx).publish_completion(destination, temporary, proposed, lambda: None)
     except subprocess.TimeoutExpired as error:
         raise BootstrapError(f"Completion generation timed out for {command}; existing file preserved") from error
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
-    ctx.record(name, [destination], provider="generated", source=source)
     ctx.status("UPDATE" if exists else "INSTALL", "completion " + command)
 
 
@@ -126,6 +132,8 @@ def provision(ctx, profile):
         try:
             provision_one(ctx, spec, fpath)
         except (BootstrapError, OSError, ValueError) as error:
+            if isinstance(error, RecoveryError) or ctx.state_failed:
+                raise
             errors.append(f"{spec['command']}: {error}")
     if errors:
         raise BootstrapError("; ".join(errors))

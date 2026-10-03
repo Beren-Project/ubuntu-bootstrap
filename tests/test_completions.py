@@ -26,6 +26,7 @@ class CompletionTests(unittest.TestCase):
         self.destination = self.home / ".zfunc/_fixture"
         self.spec = {"command": "fixture", "profile": "cargo", "owner": "fnm",
                      "executable": "fixture", "arguments": ["completions", "zsh"]}
+        self.ctx.config["zsh_completions"].append(self.spec)
         self.application()
         self.stdout = redirect_stdout(io.StringIO())
         self.stdout.__enter__()

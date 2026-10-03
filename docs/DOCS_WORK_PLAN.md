@@ -1,5 +1,8 @@
 # Documentation improvement work plan
 
+Historical documentation-only plan. Current runtime maintenance is described
+in [the 2026-10-03 maintenance design](MAINTENANCE_2026-10-03.md).
+
 Approved 2026-10-02. Starting revision: `f5e841a` (completion follow-up), with a
 clean worktree. This document records this bounded documentation change, rather
 than creating a new runtime configuration or ongoing agent framework.

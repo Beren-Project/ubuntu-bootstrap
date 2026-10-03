@@ -1,15 +1,21 @@
 # Validation
 
 This is a dated evidence index, not a promise that every scenario ran at the
-current revision. The implementation documented here is `f5e841a`; its core baseline and
-completion follow-up were subsequently committed by the user after the original
-implementation agents finished without committing or pushing.
+current revision. Earlier records retain their historical pins, ownership
+layouts and limitations. The core and completion implementations were
+subsequently committed by the user after their implementation agents finished
+without committing or pushing.
+
+The [2026-10-03 maintenance design](MAINTENANCE_2026-10-03.md) supersedes the
+inline-inventory and exception-only publication debts described in older
+records. It describes the current schema, ownership and recovery state machines.
 
 | Record | Code/evidence scope | Local suite | Real installation evidence |
 | --- | --- | --- | --- |
 | [Core qualification — 2026-10-01](#core-qualification--2026-10-01) | Original core implementation, subsequently committed as `ec3df7f` | 35 tests plus static checks | Fresh x86_64 Ubuntu 26.04, all profiles, 1000.62 s |
 | [Completion follow-up — 2026-10-02](#completion-follow-up--2026-10-02) | Completion implementation, subsequently committed as `f5e841a` | 51 tests plus static checks | Fresh x86_64 Ubuntu 26.04, focused base scenario, 233.28 s |
 | [Documentation follow-up — 2026-10-02](#documentation-follow-up--2026-10-02) | Documentation-only changes on `f5e841a`; implementation unchanged | 51 tests plus static and documentation checks | No installation run; earlier qualification unchanged |
+| [Cargo ownership and durable recovery — 2026-10-03](#cargo-ownership-and-durable-recovery--2026-10-03) | Coordinated maintenance on clean `0a19f52`; uncommitted | 113 tests plus static/documentation checks | Final fresh x86_64 Ubuntu 26.04, all profiles, 2331.14 s |
 
 The focused completion run did not reinstall the all-profile engineering
 baseline. New documentation verification belongs in a separate dated record;
@@ -443,3 +449,170 @@ transaction guarantee and can leave staging/recovery files for inspection.
 If the filesystem prevents restoration or cleanup, bootstrap reports the named
 recovery path instead of deleting the only recovery copy. No redesign into a
 persistent transaction journal was introduced.
+
+## Cargo ownership and durable recovery — 2026-10-03
+
+Started at clean `0a19f529457a744e5d74df55622fbb1a5894b0c9`. This coordinated
+maintenance pass changes the reviewed dotfiles pin, replaces shell installers,
+moves uv/Juliaup into the shared Cargo pipeline, and closes both receipt debts.
+The [maintenance design](MAINTENANCE_2026-10-03.md) records trust, migration,
+inventory schema, transaction state machines and limits. No host bootstrap was
+applied; no files were staged, committed or pushed.
+
+### Independent upstream review
+
+The full new dotfiles commit is
+`c44e4b8c8299f2b05ee225678daead77bf5bfbd1`, whose sole parent is the previous
+reviewed `f7c3eb9ce433a1a8e285afdcda06c1da56c018fd`. Exact objects, origin and
+remote HEAD were checked in an isolated inspection clone. The entire ten-file
+diff (515 insertions, 20 deletions) adds colored comparison/public-sync output,
+a terminal renderer and related docs/tests. Selected config files, restore,
+plugin/dependency interfaces, Cargo environment sourcing and native Julia
+completion sourcing are unchanged. The five-file restore set is unchanged.
+
+Official Rustup binary/checksum endpoints and executable/CLI help were inspected,
+including GNU x86_64 and aarch64 artifacts. The current reviewed init is 1.29.1;
+bootstrap does not pin that ordinary version. Published uv 0.12.22 and Juliaup
+1.22.7 crates, bin feature gates, actual release archives and cargo-binstall
+compatibility were checked before selecting the manifest URL/layout metadata.
+Real dry runs used official published manifests and successful GNU uv/musl
+Juliaup paths. [UPSTREAM.md](UPSTREAM.md) contains the authorities and layouts.
+
+### Local regressions and separate review
+
+Final focused maintenance tests pass **26 tests**. The full `./scripts/test`
+passes **113 tests**, plus manifest validation, Python AST parsing, shell syntax
+and ShellCheck. `git diff --check` passes. Tests exercise strict checksum gates,
+Rust order/preservation/update, lazy shared Cargo capability, binary-first and
+locked fallback, migration refusal/retirement/restart, receipt migration and
+inventory identity/reference integrity. Existing completion, consent, ownership,
+engineering and profile regressions remain included.
+
+Recovery tests construct persisted phases and mixed artifact/state combinations
+at every publication boundary, including phase records lagging replacements,
+terminal cleanup interruptions, unsafe/mismatched recovery material and failed
+restoration. An `os._exit` subprocess leaves publication for startup recovery.
+File/directory fsync ordering, durable new ancestry and replacement persistence
+before retirement have regression coverage. Recovery failure retains named
+material and suspends state-dependent work.
+
+A separate review after the first successful full qualification checked trust,
+Cargo ownership and scoped updates, legacy receipt/path/hash/type evidence, PATH
+shadows, canonical inventory references, journal phases, fsync order, symlinks,
+interruption boundaries, staging cleanup and accidental scope expansion. It
+found and fixed three concrete defects, each reproduced by a failing regression:
+
+- Existing symlinked Cargo/Rustup roots could redirect owned manager operations;
+  secure user-owned directories are checked before verification/updates.
+- Custom Juliaup depots were refused during completion preparation after runtime
+  operations; the shared refusal now precedes manager/runtime operations and
+  handles empty/relative overrides too.
+- Failed migration retirement recovery could surface as an ordinary optional
+  failure; it now stops the run and reports the exact retained transaction path.
+
+Earlier durability review also added fsync for newly created managed directory
+ancestry and for verified Cargo binaries/registration before legacy retirement.
+The affected and full suites passed after the fixes. The remaining separate
+review found no further defects. Runtime/manifest/test hashes were saved before
+the final fresh qualification; no runtime edits are made while it runs.
+
+### Installation evidence and measurement
+
+The first complete fresh all-profile qualification passed in **811.50 seconds**,
+exit 0, without retry, using unchanged frozen inputs. It exercised verified Rust
+order, Cargo-owned uv/uvx and Juliaup/julia, the real binary-first paths and
+cargo-update/Macchina locked source fallback, managed CPython, Julia release,
+actual restored login-shell command resolution and native completion sourcing.
+All engineering/editor smoke tests, shell consent/conflicts, ordinary second
+passes, and scoped update checks passed; the unrelated Cargo fixture was untouched.
+The final failure list was empty. Runtime review fixes were followed by the separate final
+fresh qualification below.
+
+Migration uses an equivalent verified legacy layout and baseline receipt formats,
+constructed from official checksummed release archives, retaining working Python
+and Julia data. It does not execute historical shell installers. It proves old
+PATH shadowing first, migrates both managers, verifies exact launcher retirement
+and Cargo command resolution, preserves runtime versions and Julia channel JSON,
+keeps the unreceipted legacy `julialauncher` target, and checks a subsequent
+unchanged pass. Recovery regressions also run in the Ubuntu container's isolated
+temporary homes.
+
+The measured same-input all-profile representation is **4,329,521 bytes inline →
+1,145,761 bytes shared**, **73.54% smaller**: 40 command references, nine unique
+inventories. The saved preceding baseline was 4,329,372 bytes; its projected
+normalization was 1,145,612 bytes, also 73.54% lower. Ownership hashes and
+unrelated receipt fields were not optimized. Shared snapshots/references survive
+ordinary reruns and scoped updates.
+
+### Final qualification and resources
+
+After the final-review runtime fixes, the exact required command
+`./scripts/test-podman --scenario all --debug-retry` passed a **fresh Ubuntu
+26.04 x86_64** all-profile scenario, exit 0, in **2,331.14 seconds**, without any
+scenario/debug retry. Runtime, manifest and test hashes all still matched the
+pre-run snapshot. The last-run failure list is empty. No runtime or test edits
+followed this qualification.
+
+Compared with the first successful run, more binary paths were unavailable,
+so this run additionally exercised actual locked-source installs of ripgrep,
+zoxide, mcat and uv. Cargo recovered transient dependency-download errors;
+uv's large release build accounts for much of the longer time. Both successful
+runs used cargo-binstall first, retaining the same source fallback. Juliaup's
+binary path succeeded; its locked fallback command/bin/version validation is
+also covered by the focused regressions.
+
+The final run passed actual Cargo ownership/registry/version checks and restored
+login-shell resolution for uv, uvx, Juliaup and Julia; managed Python and Julia
+release arithmetic; all engineering/editor checks; native/generic completion
+validation and failure preservation; equivalent verified legacy migration with
+unchanged runtimes/channel JSON and retired PATH shadows; deterministic startup
+recovery tests inside Ubuntu; all-profile unchanged reruns; and selected owned
+updates preserving the unrelated Cargo fixture and excluded/personal configs.
+
+Final measured inventory representation: **4,329,509 → 1,145,749 bytes**, a
+**73.54% reduction**, with 40 command references and nine unique snapshots. The
+small difference from the first measurement comes from actual installed
+completion source observations, including source-built uv. The same-input
+comparison changes only inventory representation. Final receipts retain valid
+shared references after reruns and updates.
+
+Every invocation inspected both `podman ps` and `podman ps -a` before creation
+and after cleanup. Independent final inspections repeated both lists. Before
+and after all sessions: **zero running containers, the same seven unrelated
+stopped OpenProject containers, zero project test containers**. Final audit
+compares IDs, names, states and exit codes exactly; they are unchanged.
+
+Only the following session-created containers were removed, each sequentially
+under `ubuntu-bootstrap-integration` and the existing project labels:
+
+```text
+16957c7f106d6254d0a1efa691405d283aeb196ba6972270b3813e1e527a4023  interrupted early for directory durability fix
+30c6eb76d6007bd320ad70d4fafee9c526e39161446ff42bdcc963c0587f45d5  first successful qualification
+3e07c462b46e5d686f44c40b9ecf570248907fb71679c96f799ea9eb361c6f7b  final successful qualification after review fixes
+```
+
+The fixed 6 GiB/four-CPU limits and session-owned `--rm`/finally cleanup remain.
+No borrowed or unrelated container, volume or image was deleted. No numbered
+containers, custom images or global prune were used. Cached Ubuntu images were
+retained. Ignored `test-results/` holds final receipts, last-run summary, log,
+inventory measurement and before/after resource audit. The first successful
+run's evidence is separately preserved under
+`/tmp/ubuntu-bootstrap-maintenance-first-*`.
+
+Final Markdown file/anchor and whitespace checks pass, including new files.
+The final `git diff --check` passes. Handoff worktree changes comprise 22 modified
+tracked files and five new files, listed in the maintenance handoff; Git HEAD
+remains the actual starting commit. No staging, commit, push or host bootstrap
+application occurred.
+
+### Limits
+
+Qualification covers the supported Ubuntu/Linux filesystem semantics exercised
+by the container and deterministic crash-state/subprocess tests. It does not
+claim arbitrary storage/hardware-failure protection, a whole-bootstrap
+transaction, or automatic recovery of third-party Cargo installer internals.
+Ambiguous INSTALLING output and unproven/unjournaled recovery material are
+preserved for operator inspection. Changed/unmanaged legacy launchers are
+preserved and refused. The migration test constructs verified equivalent legacy
+state rather than running the historical shell installers. ARM64 installation,
+live WSL/Wayland/terminal behavior and hosted Actions were not qualified here.

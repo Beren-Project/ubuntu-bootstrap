@@ -37,12 +37,12 @@ The manifest's dependency edges are:
 ```mermaid
 flowchart LR
     apt --> rust --> cargo --> node
-    apt --> python
+    rust --> python
     cargo --> dotfiles
     python --> dotfiles
     node --> dotfiles
     apt --> build --> ngspice
-    apt --> julia
+    rust --> julia
     apt --> openmodelica
     apt --> vim
     apt --> nvim
@@ -75,7 +75,9 @@ The CLI takes a nonblocking exclusive `flock` on the state directory's `lock`
 before installation; a second bootstrap using that state directory is refused.
 The plan path precedes this lock. Commands and their output append to
 `bootstrap.log`; receipts and `last-run.json` are published by replacing a
-temporary state file. Symlinked lock, receipt, log and diagnostic destinations
+temporary state file after file fsync, followed by parent-directory fsync.
+Receipt loading, transaction recovery and inline-inventory normalization occur
+under the exclusive lock before ownership decisions. Symlinked lock, receipt, log and diagnostic destinations
 are refused. These files provide diagnostics and ownership observations;
 they are not the configuration authority.
 
@@ -128,7 +130,7 @@ than deletion of existing trees.
 
 The dotfiles checkout must have the exact expected origin, clean working tree
 (including ignored files), full pinned HEAD
-`f7c3eb9ce433a1a8e285afdcda06c1da56c018fd` and no index flags hiding changes
+`c44e4b8c8299f2b05ee225678daead77bf5bfbd1` and no index flags hiding changes
 before upstream scripts execute. Bootstrap calls upstream dependency reporting,
 pinned plugin installation, then selective restore preview and apply using
 repeated `--file` arguments for `.zshrc`, `.zshenv`, `.gitconfig`, `.tmux.conf`
@@ -178,10 +180,13 @@ The loading probe must use the same command/function/path selection whose
 package ownership was verified, and checks the actual function source. Base
 and optional command names share one duplicate-protection boundary.
 
-Package/artifact inventories remain duplicated per command for direct diagnostic
-inspection. The qualified all-profile snapshot is about 4.1 MiB. No correctness
-or measured performance problem justified changing this disposable representation;
-the manifest remains desired-state authority.
+Package/artifact inventories are canonicalized and SHA-256 addressed once in
+`receipts.json` under `_completion_inventories` (`schema = 1`, `snapshots`). Each
+command observation uses `inventory_ref`. Identical inventories share an identity;
+changed contents create a new identity. Inline legacy observations normalize
+automatically without altering ownership hashes; bad digests/references fail
+closed. Unreferenced snapshots are removed on receipt publication. Inventories
+remain diagnostic evidence, and the manifest remains desired-state authority.
 
 For selected Julia, the owned `juliaup completions zsh` generator publishes the
 official sourced script at `~/.julia/juliaup/completions/zsh.zsh`, the exact
@@ -190,13 +195,15 @@ location read by the pinned dotfiles. Native validation separately checks syntax
 strict generic autoload validator is unchanged. The native script is generated
 as the user and staged beside its destination; failed generation preserves the
 old script, and failed final restored-shell validation rolls back publication
-while retaining its previous timestamp and receipts. Both native command
-observations are committed together before the recovery copy is discarded;
-receipt-write failures and caught rename interruptions restore previous state.
-Once both receipt observations commit, later interruptions or recovery-copy
-cleanup errors leave the matching new script and receipts intact.
-If restoration itself fails, the error identifies the retained recovery copy
-instead of deleting it. Existing native files and parents must be user-owned and
+while retaining its previous timestamp and receipts. Both native command observations are published together through a persistent
+artifact/state transaction. Generated base completions and transitions to system
+providers reuse that publication primitive. Before COMMITTED, startup recovery
+restores the previous artifact and receipts; after COMMITTED it keeps the new
+matching pair. Recovery runs before handlers under the state lock, validates
+paths/types/owners/hashes, retains recovery copies until a terminal state is
+durable, and cleans only transaction-owned staging. Failed recovery stops the
+run and reports retained material. See [maintenance design](MAINTENANCE_2026-10-03.md).
+Existing native files and parents must be user-owned and
 not writable by group/others; only newly created directories get secure modes.
 Unchanged observed sources
 preserve valid files; changed generator versions/hashes/arguments refresh them.
@@ -238,3 +245,19 @@ Any recorded failure makes the overall run return 1 and prevents entering Zsh.
 A successful run may exec a login Zsh only with an interactive terminal, outside
 CI and non-interactive mode, after releasing the lock. Keyboard interruption
 returns 130; an early exception can occur before final summary/state publication.
+
+## Manager capability and Cargo migrations
+
+Python and Julia depend on Rust, independently of the `cargo` CLI collection.
+The common application installer lazily ensures cargo-binstall once per run.
+Package specifications are read from the existing Cargo tool list or the owning
+Python/Julia manifest section; there is one installer and one scoped update path.
+Juliaup binary ownership uses `juliaup`; the `julia` receipt observes runtime/channel
+state. Native completion generator ownership uses `juliaup`, while reviewed
+`--adopt julia` consent still governs native completion reconciliation.
+
+Legacy uv and Juliaup launcher migration requires the exact previous managers,
+paths, hashes and supported types. Replacement Cargo registration and binaries
+are validated before any old launcher is retired; a durable journal reconciles
+interrupted retirement and final receipt publication. No environment, depot,
+channel, directory or unrelated executable is removed.

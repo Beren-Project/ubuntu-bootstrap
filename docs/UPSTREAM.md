@@ -1,25 +1,26 @@
 # Installation authorities and reviewed pins
 
-Core installation authorities and pins were reviewed 2026-10-01; completion
-interfaces were inspected 2026-10-02. These are historical review dates, not a
-new live upstream audit. Policies and immutable artifact inputs are centralized
+Rust distribution interfaces, published uv/Juliaup crates and release layouts,
+and the new dotfiles pin were independently reviewed 2026-10-03. Completion
+interfaces retain their 2026-10-02 review; unrelated authorities retain their
+2026-10-01 review. Policies and immutable artifact inputs are centralized
 in [config/bootstrap.toml](../config/bootstrap.toml); this document records why
 those methods were selected. Observed installation results and qualification
 limits are separate in [VALIDATION.md](VALIDATION.md).
 
 | Component | Official guidance | Implementation |
 | --- | --- | --- |
-| Rust | https://rust-lang.org/tools/install/ and official rustup installer help | rustup stable/minimal, `--no-modify-path` |
+| Rust | [Rustup binary/checksum interface](https://github.com/rust-lang/rustup/blob/main/doc/user-guide/src/installation/other.md) and verified rustup-init 1.29.1 help | Official target binary plus `.sha256`; no toolchain at init, self-update first, then stable/minimal/default; `--no-modify-path` |
 | Cargo binaries | https://github.com/cargo-bins/cargo-binstall | Official release archive; manifest crates through binstall with explicit locked source fallback |
-| uv | https://docs.astral.sh/uv/reference/installer/ | Official installer; `UV_NO_MODIFY_PATH=1` |
+| uv | [uv Cargo installation](https://docs.astral.sh/uv/getting-started/installation/#cargo) and published crate/release manifests | Cargo-owned uv/uvx through binstall/locked fallback; no uv self-update |
 | Python | https://docs.astral.sh/uv/concepts/python-versions/ | Stable managed CPython via uv, user-local default launchers |
 | Node | https://github.com/Schniz/fnm/blob/master/docs/commands.md | fnm latest LTS and managed default |
-| Julia | https://docs.julialang.org/en/v1/manual/installation/ | Juliaup release, `--add-to-path=no`, no scheduled self-updates |
+| Julia | https://docs.julialang.org/en/v1/manual/installation/ | Cargo-owned Juliaup/julia; Juliaup owns `release`; no Juliaup binary self-update |
 | Neovim | https://github.com/neovim/neovim/blob/master/INSTALL.md | Named official stable archive, GitHub release SHA-256, `/opt` installation |
 | OpenModelica | https://openmodelica.org/download/download-linux/ | Official signed resolute/stable repository; `--no-install-recommends omc` |
 | ngspice | https://ngspice.sourceforge.io/download.html and release `INSTALL` | Manual out-of-tree release build, normal-user staging, system publication |
 
-Dotfiles commit `f7c3eb9ce433a1a8e285afdcda06c1da56c018fd` was inspected against
+Dotfiles commit `c44e4b8c8299f2b05ee225678daead77bf5bfbd1` was inspected against
 its selective restore implementation and bootstrap contract. The selected paths
 are exactly `.zshrc`, `.zshenv`, `.gitconfig`, `.tmux.conf` and
 `.config/starship.toml`, using repeated upstream `--file` flags for preview/apply.
@@ -70,7 +71,7 @@ Missing providers are an explicit, nonfatal `unavailable` observation. A future
 trusted package provider can be discovered and qualified through installed
 inventories and `fpath`; no unofficial files or handwritten definitions are
 substituted. Pin-specific shell integration remains the responsibility of the
-reviewed [public dotfiles](https://github.com/Beren-Project/dotfiles-public/blob/f7c3eb9ce433a1a8e285afdcda06c1da56c018fd/home/.zshrc).
+reviewed [public dotfiles](https://github.com/Beren-Project/dotfiles-public/blob/c44e4b8c8299f2b05ee225678daead77bf5bfbd1/home/.zshrc).
 
 Inspected 2026-10-02 against official guidance/source and installed CLI help.
 Only application-provided stable generators are declared in `zsh_completions`
@@ -106,3 +107,24 @@ official generated integration location. Zsh's system `_vim` declares `nvim`
 alongside Vim, so Neovim requires no fabricated or duplicate completion file.
 Bottom, hyperfine and dust are absent from the bootstrap tool manifest and are
 outside this completion change.
+
+## Reviewed Cargo packaging and dotfiles delta (2026-10-03)
+
+Published [uv 0.12.22](https://crates.io/crates/uv/0.12.22) declares Linux `uv` and `uvx`; `uvw` is feature-gated for
+Windows. Its official archive uses `uv-{target}/{bin}` under
+`releases/download/{version}/uv-{target}.tar.gz`. Published Juliaup 1.22.7
+([published crate](https://crates.io/crates/juliaup/1.22.7)) declares `juliaup`
+and `julia`; installer and `julialauncher` names require
+additional features. Its official portable archive uses root-level `{bin}`
+under `releases/download/v{version}/juliaup-{version}-{target}-portable.tar.gz`.
+The archive's extra GUI binary is not a declared Cargo install output. Both
+layouts passed cargo-binstall dry runs against the actual published manifests
+(x86_64 GNU uv, x86_64 musl Juliaup). These versions document inspected inputs;
+bootstrap continues to resolve current stable crates, without ordinary pins.
+
+The [new dotfiles HEAD](https://github.com/Beren-Project/dotfiles-public/commit/c44e4b8c8299f2b05ee225678daead77bf5bfbd1) directly follows the previous reviewed
+`f7c3eb9ce433a1a8e285afdcda06c1da56c018fd`. The complete delta adds ANSI colors
+to comparison/public-sync reports and their tests: 10 files, 515 insertions,
+20 deletions. Selected configs, managed restore selection, restore implementation,
+dependency checker, plugin installer/pins, Cargo environment sourcing and Julia
+native sourcing are unchanged. The new renderer is not added to restore scope.

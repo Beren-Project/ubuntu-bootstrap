@@ -17,6 +17,7 @@ from . import apt, completions, dotfiles, editors, julia, ngspice, node, openmod
 from .config import OPTIONAL, load_manifest, resolve
 from .platform import BootstrapError, detect, invoking_user
 from .runtime import Context
+from .durability import RecoveryError
 
 
 def arguments(argv=None):
@@ -56,8 +57,8 @@ def main(argv=None):
                 raise BootstrapError("Unknown optional component; choose names shown in the menu")
             requested = entered
         profiles = resolve(config, [*config["defaults"], *requested])
-        names = set(config["profiles"]) | {t["crate"] for t in config["cargo_tools"]} | {"uv", "cargo-binstall"}
-        adopt_names = {t["crate"] for t in config["cargo_tools"]} | {"rust", "cargo-binstall", "uv", "python", "node", "julia", "nvim", "ngspice"}
+        names = set(config["profiles"]) | {t["crate"] for t in rust.applications(config)} | {"cargo-binstall"}
+        adopt_names = {t["crate"] for t in rust.applications(config)} | {"rust", "cargo-binstall", "python", "node", "julia", "nvim", "ngspice"}
         if any(name not in adopt_names for name in args.adopt) or any(name not in names for name in args.attempt_unqualified):
             raise BootstrapError("Unknown ownership/architecture component identifier")
         if args.plan:
@@ -65,7 +66,7 @@ def main(argv=None):
             return 0
         if not shutil.which("sudo", path="/usr/bin:/bin"):
             raise BootstrapError("Install sudo and give your normal user sudo access first")
-        ctx = Context(config, args, user, home, arch)
+        ctx = Context(config, args, user, home, arch, defer_state=True)
         lock_path = ctx.state / "lock"
         if lock_path.is_symlink():
             raise BootstrapError("Refusing symlinked bootstrap lock")
@@ -74,6 +75,7 @@ def main(argv=None):
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as error:
                 raise BootstrapError("Another bootstrap is running") from error
+            ctx.initialize_state()
             ctx.status("VERIFY", "platform", f"Ubuntu 26.04/{arch}; original user {user.pw_name}")
             # Obtain ARM64 decisions before installing a declined profile's prerequisites.
             declined = {name for name in [*config["defaults"], *requested]
@@ -98,6 +100,8 @@ def main(argv=None):
                 try:
                     handlers[name](ctx)
                 except (BootstrapError, OSError, ValueError) as error:
+                    if isinstance(error, RecoveryError) or ctx.state_failed:
+                        raise
                     ctx.status("ERROR", name, str(error))
                     failed.add(name)
                     if name in config["defaults"]:
@@ -108,6 +112,8 @@ def main(argv=None):
                     try:
                         completions.provision(ctx, name)
                     except (BootstrapError, OSError, ValueError) as error:
+                        if isinstance(error, RecoveryError) or ctx.state_failed:
+                            raise
                         ctx.status("ERROR", name + " completions", str(error))
                         failed.add(name + " completions")
             login = None

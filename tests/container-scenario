@@ -36,6 +36,8 @@ fi
 if [[ "$scenario" == all || "$scenario" == engineering ]]; then
     /workspace/bootstrap --non-interactive --no-change-shell --build --ngspice --openmodelica --vim --nvim --emacs --julia
     /usr/bin/python3 -B /workspace/tests/container_checks.py engineering
+    /usr/bin/python3 -B /workspace/tests/container_checks.py legacy_migration
+    /usr/bin/python3 -B /workspace/tests/container_checks.py recovery_regressions
     /usr/bin/python3 -B /workspace/tests/container_checks.py snapshot
     /workspace/bootstrap --non-interactive --no-change-shell --build --ngspice --openmodelica --vim --nvim --emacs --julia
     /usr/bin/python3 -B /workspace/tests/container_checks.py repeat

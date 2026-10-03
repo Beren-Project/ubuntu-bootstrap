@@ -23,7 +23,17 @@ def load_manifest():
         raise ValueError("Invalid dotfiles selection")
     resolve(config, config["profiles"])
     names = set()
-    owners = {tool["crate"] for tool in config["cargo_tools"]} | {"apt", "rust", "uv"}
+    tools = [*config["cargo_tools"], config["python"]["cargo"], config["julia"]["cargo"]]
+    crates = [tool["crate"] for tool in tools]
+    bins = [binary for tool in tools for binary in tool["bins"]]
+    if len(crates) != len(set(crates)) or len(bins) != len(set(bins)):
+        raise ValueError("Duplicate Cargo application/binary ownership")
+    for tool in tools:
+        if not tool["bins"] or not set(tool.get("version_bins", tool["bins"])).issubset(tool["bins"]):
+            raise ValueError("Invalid Cargo application version probes")
+        if any(not re.fullmatch(r"[a-zA-Z0-9_-]+", value) for value in [tool["crate"], *tool["bins"]]):
+            raise ValueError("Unsafe Cargo application name")
+    owners = set(crates) | {"apt", "rust"}
     for spec in config["zsh_completions"]:
         name = spec["command"]
         if not re.fullmatch(r"[a-z][a-z0-9-]*", name) or name in names:
@@ -59,7 +69,7 @@ def validate_optional_completions(config):
         if provider == "unavailable" and not spec.get("reason"):
             raise ValueError("Unavailable completion needs an explicit reason")
         if provider == "upstream-managed":
-            if spec["profile"] != "julia" or spec.get("owner") != "julia":
+            if spec["profile"] != "julia" or spec.get("owner") != "juliaup":
                 raise ValueError("Unknown upstream-managed completion owner")
             for key in ("destination", "executable"):
                 value = Path(spec[key])

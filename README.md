@@ -58,17 +58,17 @@ purpose, command and owner.
 | Default group | Installed components | Installer |
 | --- | --- | --- |
 | System base | ca-certificates, curl, git, gh, python3, zsh, tmux, fzf, wl-clipboard (`wl-copy`, `wl-paste`) | Ubuntu APT |
-| Rust | rustup; stable/minimal toolchain (`rustc`, `cargo`) | Official rustup installer |
+| Rust | rustup; stable/minimal toolchain (`rustc`, `cargo`) | Verified official rustup-init binary |
 | Cargo support | cargo-binstall; cargo-update (`cargo-install-update`, `cargo-install-update-config`) | Official binstall archive; Cargo via binstall/source fallback |
 | CLI applications | starship, bat, eza, fd-find (`fd`), fnm, git-delta (`delta`), ripgrep (`rg`), zoxide, macchina, mcat | Cargo via binstall/source fallback |
-| Python | uv/uvx; stable managed CPython with user-local `python`/`python3` launchers | Official uv installer, then uv |
+| Python | uv/uvx; stable managed CPython with user-local `python`/`python3` launchers | Cargo via binstall/source fallback, then uv |
 | Node | Current Node LTS, selected as the managed default | fnm |
 | Shared configuration | `.zshrc`, `.zshenv`, `.gitconfig`, `.tmux.conf`, `.config/starship.toml`; pinned standalone Zsh plugins | Pinned dotfiles-public restore/plugin scripts |
 
 | Optional flag | Installed components | Installer |
 | --- | --- | --- |
 | `--build` | build-essential, pkg-config, cmake, ninja-build | Ubuntu APT |
-| `--julia` | Juliaup and Julia `release` channel | Official Juliaup installer |
+| `--julia` | Juliaup and Julia `release` channel | Cargo via binstall/source fallback, then Juliaup |
 | `--ngspice` | ngspice 47; enables `build` and [simulator prerequisites](docs/USAGE.md#build-and-installer-dependencies) | Verified pinned source; dependencies through APT |
 | `--openmodelica` | gnupg and `omc` CLI from signed official `resolute`/stable repository | Ubuntu and official OpenModelica APT repositories |
 | `--vim` | vim | Ubuntu APT |
@@ -90,7 +90,7 @@ Unqualified ARM64 `dotfiles`, `ngspice`, `nvim` and `cargo-update` require opt-i
 Reruns preserve working owned tools. **First runs and reruns can back up and
 replace existing differing files among the five shared configs**; identical
 files create no backup. Dotfiles revision
-`f7c3eb9ce433a1a8e285afdcda06c1da56c018fd` is consumed through upstream preview/apply
+`c44e4b8c8299f2b05ee225678daead77bf5bfbd1` is consumed through upstream preview/apply
 with the same five explicit `--file` arguments and all upstream protections.
 
 `--update` updates selected owned channel-managed components; repeat optional
@@ -133,3 +133,9 @@ This project starts **inside Ubuntu**. Windows/WSL provisioning, Windows
 packages, fonts, host/network configuration and personal project environments
 remain outside its scope. Containers do not qualify every WSL behavior; live
 Wayland clipboard use and terminal/font appearance need session-specific checks.
+
+Manager ownership is explicit: APT supplies the OS foundation; verified
+`rustup-init` bootstraps Rustup before stable Rust; Cargo plus cargo-binstall owns
+CLI applications, uv and Juliaup. uv owns managed CPython and Juliaup owns Julia
+release channels. Cargo remains binary-first with controlled `cargo install
+--locked` fallback. See [migration and crash recovery](docs/MAINTENANCE_2026-10-03.md).

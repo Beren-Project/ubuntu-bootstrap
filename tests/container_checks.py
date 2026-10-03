@@ -13,6 +13,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from bootstrap_lib.config import load_manifest, resolve
+from bootstrap_lib.inventories import SECTION, resolve as resolve_inventory
 
 HOME = Path.home()
 CONFIG = load_manifest()
@@ -81,7 +82,7 @@ def optional_completions():
                 system_arguments.extend([command, spec["function"], str(path)])
             elif spec["provider"] == "unavailable":
                 assert entry["reason"] and not entry["paths"], entry
-                observed = entry["inventory"]
+                observed = resolve_inventory(receipts, entry)
                 assert set(inventory).issubset(observed), (command, observed.keys())
                 for key, files in inventory.items():
                     assert set(files) == set(observed[key]), (command, key)
@@ -256,7 +257,7 @@ def base():
         path = HOME / ".cargo/bin" / tool
         assert path.stat().st_uid == os.getuid(), tool
         run(str(path), "-V" if tool == "cargo-binstall" else "--version")
-    assert (HOME / ".local/bin/uv").stat().st_uid == os.getuid()
+    assert (HOME / ".cargo/bin/uv").stat().st_uid == os.getuid()
     assert (HOME / ".local/bin/python").stat().st_uid == os.getuid()
     run(str(HOME / ".local/bin/python"), "--version")
     run(str(HOME / ".cargo/bin/fnm"), "exec", "--using", "default", "node", "--version")
@@ -284,6 +285,13 @@ def base():
     report = run("/usr/bin/python3", "-B", str(root / "scripts/check_dependencies.py"))
     assert "MISSING: zellij" in report
     run("/usr/bin/zsh", "-lic", "command -v cargo; command -v uv; command -v node; command -v delta")
+    cargo_ownership(False)
+    log = (STATE / "bootstrap.log").read_text()
+    assert "sh.rustup.rs" not in log and "astral.sh/uv/install.sh" not in log and "install.julialang.org" not in log
+    init = log.index("--default-toolchain none")
+    self_update = log.index("rustup self update", init)
+    stable = log.index("rustup toolchain install stable", self_update)
+    assert init < self_update < stable
     completions()
     print("OK base: real installers, ownership, exact selective restore, pinned plugins, excluded files, No shell path")
 
@@ -400,7 +408,9 @@ def engineering():
     run("/opt/nvim-linux-x86_64/bin/nvim", "--headless", "-u", "NONE", "+quit")
     run("/usr/bin/vim", "--version")
     run("/usr/bin/emacs", "--batch", "-Q", "--eval", "(princ (+ 1 1))")
-    assert run(str(HOME / ".juliaup/bin/julia"), "-e", "print(1+1)") == "2"
+    assert run(str(HOME / ".cargo/bin/julia"), "-e", "print(1+1)") == "2"
+    cargo_ownership(True)
+    inventory_size()
     optional_completions()
     optional_completion_update()
     print("OK build, ngspice numerical smoke, GUI-free OpenModelica simulation, all editors, Julia")
@@ -426,6 +436,116 @@ def update():
     run("sha256sum", "--check", str(HOME / "excluded.sha256"))
     optional_completions()
     print("OK --update left unrelated Cargo application and excluded/personal configs untouched")
+
+
+def cargo_ownership(with_julia):
+    from bootstrap_lib.rust import crate_state, executable_version
+    from bootstrap_lib.runtime import Context
+    from types import SimpleNamespace
+    receipts = json.loads(RECEIPTS.read_text())
+    ctx = Context(CONFIG, SimpleNamespace(non_interactive=True, update=False, adopt=[]),
+                  pwd.getpwuid(os.getuid()), HOME, "amd64")
+    for profile in (["python", "julia"] if with_julia else ["python"]):
+        tool = CONFIG[profile]["cargo"]
+        receipt = receipts[tool["crate"]]
+        assert receipt["manager"] == "cargo" and receipt["crate"] == tool["crate"]
+        assert receipt["version"] == crate_state(ctx, tool)
+        for name in tool["bins"]:
+            expected = HOME / ".cargo/bin" / name
+            assert str(expected) in receipt["paths"], receipt
+            assert run("/usr/bin/zsh", "-lic", 'whence -p -- "$1"', "test", name) == str(expected)
+            assert expected.stat().st_uid == os.getuid()
+        for name in tool.get("version_bins", tool["bins"]):
+            assert executable_version(run(str(HOME / ".cargo/bin" / name), "--version")) == receipt["version"]
+    print("OK Cargo ownership, registry versions and real login-shell command resolution")
+
+
+def inventory_size():
+    from bootstrap_lib.inventories import normalize
+    from bootstrap_lib.durability import json_bytes
+    receipts = json.loads(RECEIPTS.read_text())
+    snapshots = receipts[SECTION]["snapshots"]
+    inline = {k: dict(v) for k, v in receipts.items() if k != SECTION}
+    count = 0
+    for name, entry in inline.items():
+        if "inventory_ref" in entry:
+            entry["inventory"] = resolve_inventory(receipts, entry)
+            del entry["inventory_ref"]
+            count += 1
+    before, after = len(json_bytes(inline)), len(json_bytes(receipts))
+    assert after < before * 0.5, (before, after)
+    assert normalize(receipts) == receipts
+    evidence = {"inline_bytes": before, "deduplicated_bytes": after,
+                "referencing_commands": count, "unique_snapshots": len(snapshots),
+                "reduction_percent": round(100 * (1 - after / before), 2)}
+    (HOME / "inventory-size.json").write_text(json.dumps(evidence, indent=2) + "\n")
+    print("OK measured completion inventories: " + json.dumps(evidence))
+
+
+def legacy_migration():
+    """Verified equivalent baseline layout, not historical shell installers.
+
+    Use real official release artifacts and the baseline manager/receipt shapes,
+    while retaining existing working Python and Julia installations. Only the
+    two Cargo crates owned by this isolated test user are uninstalled first.
+    """
+    from bootstrap_lib.runtime import Context, release, extract
+    from types import SimpleNamespace
+    import shutil
+    ctx = Context(CONFIG, SimpleNamespace(non_interactive=True, update=False, adopt=[]),
+                  pwd.getpwuid(os.getuid()), HOME, "amd64")
+    python_before = run(str(HOME / ".local/bin/python"), "--version")
+    julia_before = run(str(HOME / ".cargo/bin/julia"), "-e", "print(VERSION)")
+    julia_config = HOME / ".julia/juliaup/juliaup.json"
+    channel_before = json.loads(julia_config.read_text())
+    for profile, repo, asset, parent in (
+        ("python", "astral-sh/uv", "uv-x86_64-unknown-linux-gnu.tar.gz", HOME / ".local/bin"),
+        ("julia", "JuliaLang/juliaup", None, HOME / ".juliaup/bin")):
+        version = ctx.receipts[CONFIG[profile]["cargo"]["crate"]]["version"]
+        asset = asset or f"juliaup-{version}-x86_64-unknown-linux-musl-portable.tar.gz"
+        # This qualification uses current stable matching official assets. The
+        # release API supplies its official SHA-256; no artifact is executed
+        # before the same production integrity/extraction checks have passed.
+        tag, url, checksum = release(repo, asset)
+        archive = ctx.download(url, checksum, "legacy-" + asset)
+        with tempfile.TemporaryDirectory(dir=ctx.cache) as tmp:
+            extract(archive, tmp)
+            source = Path(tmp) / ("uv-x86_64-unknown-linux-gnu" if profile == "python" else "")
+            run(str(HOME / ".cargo/bin/cargo"), "uninstall", CONFIG[profile]["cargo"]["crate"])
+            parent.mkdir(parents=True, exist_ok=True)
+            for name in CONFIG[profile]["cargo"]["bins"]:
+                shutil.copy2(source / name, parent / name)
+                (parent / name).chmod(0o755)
+        if profile == "julia":
+            (parent / "julia").rename(parent / "julialauncher")
+            (parent / "julia").symlink_to(parent / "julialauncher")
+            ctx.receipts.pop("juliaup")
+            ctx.record("julia", [parent / "juliaup", parent / "julia"], manager="juliaup", channel="release")
+        else:
+            ctx.record("uv", [parent / "uv", parent / "uvx"], manager="uv")
+    run(str(HOME / ".local/bin/uv"), "--version")
+    assert run(str(HOME / ".juliaup/bin/julia"), "-e", "print(VERSION)") == julia_before
+    assert run("/usr/bin/zsh", "-lic", "whence -p uv") == str(HOME / ".local/bin/uv")
+    assert run("/usr/bin/zsh", "-lic", "whence -p julia") == str(HOME / ".juliaup/bin/julia")
+    run(BOOTSTRAP, "--non-interactive", "--no-change-shell", "--build", "--ngspice", "--openmodelica", "--vim", "--nvim", "--emacs", "--julia")
+    cargo_ownership(True)
+    for path in (".local/bin/uv", ".local/bin/uvx", ".juliaup/bin/juliaup", ".juliaup/bin/julia"):
+        assert not (HOME / path).exists() and not (HOME / path).is_symlink(), path
+    assert (HOME / ".juliaup/bin/julialauncher").exists(), "unreceipted launcher target must be preserved"
+    assert run(str(HOME / ".local/bin/python"), "--version") == python_before
+    assert run(str(HOME / ".cargo/bin/julia"), "-e", "print(VERSION)") == julia_before
+    assert json.loads(julia_config.read_text()) == channel_before
+    assert not (STATE / "transaction").exists()
+    optional_completions()
+    print("OK equivalent verified legacy migration, preserved runtimes/channels and retired PATH shadows")
+
+
+def recovery_regressions():
+    # Run real filesystem/subprocess recovery cases inside the qualified Linux
+    # container too, without altering the integration user's active receipts.
+    run("/usr/bin/python3", "-B", "-m", "unittest", "discover", "-s", "/workspace/tests", "-p", "test_maintenance.py", "-v")
+    assert not (STATE / "transaction").exists()
+    print("OK deterministic publication and migration recovery regressions in Ubuntu")
 
 
 action = sys.argv[1]

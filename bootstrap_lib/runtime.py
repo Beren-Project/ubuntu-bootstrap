@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shlex
 import subprocess
@@ -11,6 +12,8 @@ import time
 import urllib.request
 
 from .platform import BootstrapError
+from .durability import RecoveryError, Transaction, atomic_bytes, fsync_directory, json_bytes, regular
+from .inventories import normalize
 
 
 def digest(path):
@@ -22,9 +25,15 @@ def safe_directory(path):
     path = Path(path).absolute()
     if any(p.is_symlink() for p in (path, *path.parents)):
         raise BootstrapError(f"Refusing managed directory with symlinked path: {path}")
+    missing = [p for p in (path, *path.parents) if not p.exists()]
     path.mkdir(parents=True, exist_ok=True)
     if path.stat().st_uid != os.getuid():
         raise BootstrapError(f"Managed directory belongs to another user: {path}")
+    # Flush each new directory and the parent entry that names it. Flushing
+    # only a later receipt/artifact parent cannot persist its own ancestry.
+    for directory in missing:
+        fsync_directory(directory)
+        fsync_directory(directory.parent)
     return path
 
 
@@ -51,7 +60,7 @@ def release(repository, asset_name):
     for asset in metadata["assets"]:
         if asset["name"] == asset_name:
             checksum = asset.get("digest") or ""
-            if not checksum.startswith("sha256:") or len(checksum) != 71:
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", checksum):
                 raise BootstrapError(f"Official release has no SHA-256 for {asset_name}")
             return metadata["tag_name"], asset["browser_download_url"], checksum[7:]
     raise BootstrapError(f"Official release has no artifact for this architecture: {asset_name}")
@@ -68,7 +77,7 @@ def extract(archive, target):
 
 
 class Context:
-    def __init__(self, config, args, user, home, architecture):
+    def __init__(self, config, args, user, home, architecture, *, defer_state=False):
         self.config, self.args, self.user, self.home, self.arch = config, args, user, home, architecture
         self.data = safe_directory(Path(os.environ.get("XDG_DATA_HOME") or home / ".local/share") / "ubuntu-bootstrap")
         self.cache = safe_directory(Path(os.environ.get("XDG_CACHE_HOME") or home / ".cache") / "ubuntu-bootstrap")
@@ -76,7 +85,8 @@ class Context:
         self.receipts_path = self.state / "receipts.json"
         if self.receipts_path.is_symlink():
             raise BootstrapError("Refusing symlinked receipts")
-        self.receipts = json.loads(self.receipts_path.read_text()) if self.receipts_path.exists() else {}
+        self.receipts = {}
+        self.state_failed = False
         self.log_path = self.state / "bootstrap.log"
         if self.log_path.is_symlink():
             raise BootstrapError("Refusing symlinked log")
@@ -84,6 +94,18 @@ class Context:
         self.apt_refreshed = False
         self.env = {**os.environ, "PATH": f"{home}/.cargo/bin:{home}/.local/bin:{home}/.juliaup/bin:/usr/local/bin:/usr/bin:/bin",
                     "GIT_TERMINAL_PROMPT": "0", "UV_NO_MODIFY_PATH": "1"}
+        if not defer_state:
+            self.initialize_state()
+
+    def initialize_state(self):
+        # Production invokes this under the CLI's exclusive flock, before any
+        # receipt-based ownership decision. Isolated test Contexts use it too.
+        Transaction(self).recover()
+        regular(self.receipts_path, missing=True)
+        prior = json.loads(self.receipts_path.read_text()) if self.receipts_path.exists() else {}
+        self.receipts = normalize(prior)
+        if self.receipts != prior:
+            self.write_state("receipts.json", self.receipts)
 
     def status(self, state, component, detail=""):
         print(f"{state:7} {component}" + (f" — {detail}" if detail else ""), flush=True)
@@ -112,25 +134,29 @@ class Context:
         return completed.stdout.strip()
 
     def record(self, name, paths=(), **details):
-        self.receipts[name] = {"paths": {str(p): digest(p) for p in paths}, **details}
-        self.write_state("receipts.json", self.receipts)
+        proposed = normalize({**self.receipts, name: {"paths": {str(p): digest(p) for p in paths}, **details}})
+        if proposed != self.receipts:
+            self.write_state("receipts.json", proposed)
+            self.receipts = proposed
 
     def write_state(self, name, value):
         destination = self.state / name
         if destination.parent != self.state or destination.is_symlink():
             raise BootstrapError(f"Refusing unsafe diagnostic state path: {destination}")
-        staged = None
+        if self.state_failed:
+            raise RecoveryError("State publication previously failed; stop and rerun recovery")
         try:
-            with tempfile.NamedTemporaryFile(mode="w", dir=self.state, delete=False) as stream:
-                staged = Path(stream.name)
-                json.dump(value, stream, indent=2, sort_keys=True)
-                stream.write("\n")
-            staged.replace(destination)
-        finally:
-            if staged:
-                staged.unlink(missing_ok=True)
+            stage_name = None
+            if name == "receipts.json" and (self.state / "transaction/journal.json").exists():
+                stage_name = Transaction(self).stage_name(destination)
+            atomic_bytes(destination, json_bytes(value), stage_name=stage_name)
+        except OSError:
+            self.state_failed = True
+            raise
 
     def owned(self, name, paths, *, system=False):
+        if self.state_failed:
+            raise RecoveryError("State publication failed; ownership decisions are suspended")
         paths = list(map(Path, paths))
         receipt = self.receipts.get(name)
         # Existing user managers/tools cannot be adopted based on PATH alone.
@@ -164,6 +190,8 @@ class Context:
         return allowed
 
     def download(self, url, checksum, filename):
+        if not re.fullmatch(r"[0-9a-f]{64}", checksum) or Path(filename).name != filename:
+            raise BootstrapError("Invalid artifact checksum/cache name")
         destination = self.cache / filename
         if destination.is_symlink():
             raise BootstrapError(f"Refusing symlinked artifact: {destination}")
@@ -177,9 +205,3 @@ class Context:
             staged = Path(stream.name)
         staged.replace(destination)
         return destination
-
-    def installer(self, url, arguments, *, env=None):
-        with tempfile.TemporaryDirectory(prefix="installer-", dir=self.cache) as directory:
-            script = Path(directory) / "install.sh"
-            script.write_bytes(get_bytes(url))
-            self.run(["/bin/sh", script, *arguments], cwd=directory, env=env)

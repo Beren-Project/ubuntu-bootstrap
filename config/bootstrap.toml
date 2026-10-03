@@ -23,7 +23,7 @@ arm64 = "supported"
 depends = ["rust"]
 arm64 = "supported"
 [profiles.python]
-depends = ["apt"]
+depends = ["rust"]
 arm64 = "supported"
 [profiles.node]
 depends = ["cargo"]
@@ -35,7 +35,7 @@ arm64 = "unqualified"
 depends = ["apt"]
 arm64 = "supported"
 [profiles.julia]
-depends = ["apt"]
+depends = ["rust"]
 arm64 = "supported"
 [profiles.ngspice]
 depends = ["build"]
@@ -56,7 +56,7 @@ arm64 = "supported"
 
 [rust]
 channel = "stable"
-installer = "https://sh.rustup.rs"
+binaries = "https://static.rust-lang.org/rustup/dist"
 binstall_repository = "cargo-bins/cargo-binstall"
 
 [[cargo_tools]]
@@ -117,17 +117,30 @@ binstall_bin_dir = "mcat-v{version}-{target}/mcat"
 binstall_urls = { amd64 = "https://github.com/Skardyy/mcat/releases/download/v{version}/mcat-v{version}-x86_64-unknown-linux-gnu.tar.xz", arm64 = "https://github.com/Skardyy/mcat/releases/download/v{version}/mcat-v{version}-aarch64-unknown-linux-gnu.tar.xz" }
 
 [python]
-installer = "https://astral.sh/uv/install.sh"
 channel = "cpython"
+[python.cargo]
+crate = "uv"
+bins = ["uv", "uvx"]
+arm64 = "supported"
+binstall_format = "tgz"
+binstall_bin_dir = "uv-{target}/{bin}"
+binstall_urls = { amd64 = "https://github.com/astral-sh/uv/releases/download/{version}/uv-{target}.tar.gz", arm64 = "https://github.com/astral-sh/uv/releases/download/{version}/uv-{target}.tar.gz" }
 [node]
 channel = "lts"
 [julia]
-installer = "https://install.julialang.org"
 channel = "release"
+[julia.cargo]
+crate = "juliaup"
+bins = ["juliaup", "julia"]
+version_bins = ["juliaup"]
+arm64 = "supported"
+binstall_format = "tgz"
+binstall_bin_dir = "{bin}"
+binstall_urls = { amd64 = "https://github.com/JuliaLang/juliaup/releases/download/v{version}/juliaup-{version}-{target}-portable.tar.gz", arm64 = "https://github.com/JuliaLang/juliaup/releases/download/v{version}/juliaup-{version}-{target}-portable.tar.gz" }
 
 [dotfiles]
 url = "https://github.com/Beren-Project/dotfiles-public.git"
-revision = "f7c3eb9ce433a1a8e285afdcda06c1da56c018fd"
+revision = "c44e4b8c8299f2b05ee225678daead77bf5bfbd1"
 files = [".zshrc", ".zshenv", ".gitconfig", ".tmux.conf", ".config/starship.toml"]
 
 [ngspice]
@@ -160,8 +173,8 @@ arm64 = "nvim-linux-arm64.tar.gz"
 profile = "julia"
 commands = ["juliaup", "julia"]
 provider = "upstream-managed"
-owner = "julia"
-executable = ".juliaup/bin/juliaup"
+owner = "juliaup"
+executable = ".cargo/bin/juliaup"
 arguments = ["completions", "zsh"]
 destination = ".julia/juliaup/completions/zsh.zsh"
 functions = ["_juliaup", "_julia_channel"]
@@ -345,13 +358,13 @@ arguments = ["completions", "zsh", "cargo"]
 command = "uv"
 profile = "python"
 owner = "uv"
-executable = ".local/bin/uv"
+executable = ".cargo/bin/uv"
 arguments = ["generate-shell-completion", "zsh"]
 [[zsh_completions]]
 command = "uvx"
 profile = "python"
 owner = "uv"
-executable = ".local/bin/uvx"
+executable = ".cargo/bin/uvx"
 arguments = ["--generate-shell-completion", "zsh"]
 [[zsh_completions]]
 command = "fnm"
