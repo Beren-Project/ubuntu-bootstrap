@@ -167,7 +167,7 @@ class OwnershipTests(unittest.TestCase):
 
     def test_cargo_update_ownership_boundary(self):
         owned = {t["crate"] for t in self.ctx.config["cargo_tools"]}
-        commands = [rust.update_argv(self.ctx, name) for name in owned]
+        commands = [rust.update_argv(self.ctx, name, "1.2.3") for name in owned]
         self.assertEqual({command[-1] for command in commands}, owned)
         for command in commands:
             self.assertNotIn("-a", command)

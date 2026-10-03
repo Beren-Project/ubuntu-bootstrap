@@ -114,6 +114,17 @@ must still be selected. Cargo updates pass one manifest crate at a time to
 cargo-binstall, never an all-installed switch. Installed `cargo-update` is a
 user utility, not bootstrap's bulk update engine. Manager metadata and executable
 versions must agree. Receipts cannot introduce unrelated tools into this loop.
+The selected stable crates.io version is resolved once per application operation,
+before either installer, and verified against the resulting Cargo registration.
+[cargo_binary.py](../bootstrap_lib/cargo_binary.py) supervises cargo-binstall's
+structured diagnostics to reject announced long GitHub retry delays before
+publication. It leaves discovery, archive verification and installation upstream;
+it is not a second installer. Automatic credential discovery is disabled. Known
+transport/unavailable-binary failures retain the locked source fallback; malformed
+metadata/archive, signature and publication failures stop. Cancellation verifies
+unchanged executable/registration evidence before allowing fallback. Unproven
+leftover Cargo staging paths are preserved and reported, never broadly removed.
+See [the exact policy and qualification evidence](CARGO_RETRY_2026-10-03.md).
 Dotfiles remain at their full pinned SHA and ngspice remains at its source
 release/checksum/configuration; updating channels does not loosen these pins.
 

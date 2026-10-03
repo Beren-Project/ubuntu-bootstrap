@@ -82,8 +82,16 @@ Every row belongs to default profile `apt`, with Ubuntu APT as installer/owner.
 ### Default user tools and runtimes
 
 Cargo binaries live in `~/.cargo/bin`. “Cargo” below means binary-first
-cargo-binstall, with an explicitly version-resolved locked source fallback and
-automatic prerequisites if the binary attempt cannot complete.
+cargo-binstall, with one stable crates.io version used for both the binary attempt
+and controlled `cargo install --locked --version VERSION` fallback. Known network
+failures or unavailable binaries can use the fallback with automatic prerequisites;
+metadata, archive, integrity and installation errors stop with diagnostics.
+Announced GitHub API retry sleeps have a five-second cumulative budget; a longer
+proposed wait is cancelled before sleeping through it. Ordinary request latency
+retains upstream's 15-second timeout per resolution candidate. No GitHub token is
+required. Explicit `GITHUB_TOKEN`/`GH_TOKEN` values are passed to cargo-binstall;
+credential discovery is disabled and values are redacted from its log. See
+[the retry policy and validation evidence](CARGO_RETRY_2026-10-03.md).
 
 | Tool/package | Command(s) | Purpose | Installer/owner |
 | --- | --- | --- | --- |

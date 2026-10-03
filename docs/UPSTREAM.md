@@ -122,6 +122,53 @@ layouts passed cargo-binstall dry runs against the actual published manifests
 (x86_64 GNU uv, x86_64 musl Juliaup). These versions document inspected inputs;
 bootstrap continues to resolve current stable crates, without ordinary pins.
 
+### Cargo-binstall GitHub retry interfaces (2026-10-03)
+
+The saved qualification receipt used **1.25.0**. An unauthenticated request to
+the official GitHub latest-release API confirmed `v1.25.0`, published
+2026-10-03T01:34:00Z, with neither draft nor prerelease set. Its tag and repository
+HEAD were `a29e25869a42756b3be062dc4dae3e4b01bb4f38`. The local host binary was
+1.24.0; its isolated public uv dry run took 4.730 seconds. Runtime qualification
+records the actually installed manager version rather than relying on that host.
+
+| Supported interface | Behavior relevant to bootstrap |
+| --- | --- |
+| `GITHUB_TOKEN`, then `GH_TOKEN`; `--github-token` | Explicit authentication; bootstrap only passes environment values, never token arguments. Authenticated requests may use GraphQL before REST. |
+| `--no-discover-github-token`; `BINSTALL_NO_DISCOVER_GITHUB_TOKEN` | Disables default Git-credential/GitHub CLI credential discovery; bootstrap always passes the flag. |
+| `--maximum-resolution-timeout`; `BINSTALL_MAXIMUM_RESOLUTION_TIMEOUT` | 15 seconds by default for each target/strategy/name candidate's discovery; excludes crate acquisition, archive download and installation. Bootstrap makes 15 explicit. |
+| `--rate-limit`; `BINSTALL_RATE_LIMIT` | Local request pacing, default one request per 10 ms; does not configure remote retry/reset waits. |
+| `--strategies`; `BINSTALL_STRATEGIES`; `--disable-strategies` | Select fetchers; bootstrap retains only `crate-meta-data`, with external controlled source fallback. |
+| `--version`, `crate@version` | An exact bare version or explicit `=VERSION` is exact, not a caret range. Bootstrap uses `--version =VERSION`. |
+| `--pkg-url`, `--pkg-fmt`, `--bin-dir` | Override published packaging metadata; existing validated overrides/layouts are retained. |
+| `--json-output`, `--log-level info` | Structured diagnostics for the narrow retry guard; no verbose header/body logging. |
+
+Reviewed [CLI definitions](https://github.com/cargo-bins/cargo-binstall/blob/v1.25.0/crates/bin/src/args.rs),
+[version semantics](https://github.com/cargo-bins/cargo-binstall/blob/v1.25.0/crates/binstalk/src/ops/resolve/version_ext.rs),
+and [credential selection](https://github.com/cargo-bins/cargo-binstall/blob/v1.25.0/crates/bin/src/entry.rs).
+Cargo's [official install documentation](https://doc.rust-lang.org/cargo/commands/cargo-install.html#install-options)
+also confirms bare `MAJOR.MINOR.PATCH` installs exactly that version, so the
+existing source command and binstall's `=VERSION` select the same crate release.
+There is no supported API-disable flag, whole-attempt timeout, or configurable HTTP
+retry count/duration in this interface. Cargo HTTP timeout settings are not wired
+to binstall's downloader; changing them would not fix its internal wait.
+
+The [release resolver](https://github.com/cargo-bins/cargo-binstall/blob/v1.25.0/crates/binstalk-fetchers/src/gh_crate_meta.rs)
+uses GitHub API existence checks even with exact versions and explicit direct
+release URLs. Public asset downloads use the direct release URL afterward, without
+the release-tag REST request, but no supported CLI setting skips the prior check.
+Bootstrap does not alter URL fragments/query strings to exploit parser behavior.
+Crates.io's existing `max_stable_version` metadata suffices to select one intended
+version independently of GitHub; it does not remove binstall's API existence check.
+
+The [downloader](https://github.com/cargo-bins/cargo-binstall/blob/v1.25.0/crates/binstalk-downloader/src/remote.rs)
+allows three attempts and clamps `Retry-After`/quota-reset delays to 120 seconds.
+It retries on these headers even with HTTP 200, and delays all requests to the
+same host. Bare 403 is not automatically a rate limit; 429, 503, connection and
+gateway timeouts also have distinct retry behavior. Bootstrap rejects recognized
+long GitHub quota/retry-delay events while leaving ordinary latency/5xx/DNS paths
+to upstream. SIGTERM is supported by [upstream cancellation](https://github.com/cargo-bins/cargo-binstall/blob/v1.25.0/crates/bin/src/signal.rs).
+See [policy, fault injection and timings](CARGO_RETRY_2026-10-03.md).
+
 The [new dotfiles HEAD](https://github.com/Beren-Project/dotfiles-public/commit/c44e4b8c8299f2b05ee225678daead77bf5bfbd1) directly follows the previous reviewed
 `f7c3eb9ce433a1a8e285afdcda06c1da56c018fd`. The complete delta adds ANSI colors
 to comparison/public-sync reports and their tests: 10 files, 515 insertions,

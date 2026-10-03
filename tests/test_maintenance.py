@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from test_logic import context
-from bootstrap_lib import durability, inventories, julia, migration, rust
+from bootstrap_lib import cargo_binary, durability, inventories, julia, migration, rust
 from bootstrap_lib.config import ROOT, resolve
 from bootstrap_lib.platform import BootstrapError
 from bootstrap_lib.runtime import digest, safe_directory
@@ -119,13 +119,15 @@ class TrustTests(Environment):
             calls = []
             def run(argv, **kwargs):
                 calls.append(list(map(str, argv)))
-                if "cargo-binstall" in str(argv[0]):
-                    return 7
                 for binary in tool["bins"]:
                     self.file(self.home / ".cargo/bin" / binary)
                 self.cargo_metadata(tool)
                 return 0
+            def attempt(ctx, argv, paths):
+                calls.append(list(map(str, argv)))
+                return cargo_binary.Result(94, "binary unavailable", 0.01)
             with patch.object(rust, "binstall"), patch.object(self.ctx, "run", side_effect=run), \
+                    patch.object(cargo_binary, "attempt", side_effect=attempt), \
                     patch.object(rust.apt, "ensure"), patch.object(rust, "get_bytes", return_value=b'{"crate":{"max_stable_version":"1.2.3"}}'), \
                     patch.object(self.ctx, "output", return_value=tool["crate"] + " 1.2.3") as output:
                 receipt = rust.install_tool(self.ctx, tool)

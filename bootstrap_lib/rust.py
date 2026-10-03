@@ -3,9 +3,10 @@ import json
 from pathlib import Path
 import re
 import tempfile
+import time
 import tomllib
 
-from . import apt
+from . import apt, cargo_binary
 from .platform import BootstrapError
 from .runtime import digest, extract, get_bytes, release, safe_directory
 from .durability import parents, regular
@@ -144,15 +145,28 @@ def crate_state(ctx, tool):
     raise BootstrapError(f"No crates.io installation metadata for {tool['crate']}")
 
 
-def update_argv(ctx, crate):
+def update_argv(ctx, crate, version):
     # One explicit manifest crate per operation. Never pass all-installed flags.
     args = [ctx.home / ".cargo/bin/cargo-binstall", "--no-confirm", "--disable-telemetry",
-            "--strategies", "crate-meta-data"]
+            "--strategies", "crate-meta-data", "--no-discover-github-token",
+            "--json-output", "--log-level", "info", "--maximum-resolution-timeout",
+            str(cargo_binary.RESOLUTION_TIMEOUT), "--version", "=" + version]
     tool = next(t for t in applications(ctx.config) if t["crate"] == crate)
     if "binstall_urls" in tool:
         args.extend(["--pkg-url", tool["binstall_urls"][ctx.arch],
                      "--pkg-fmt", tool["binstall_format"], "--bin-dir", tool["binstall_bin_dir"]])
     return [*args, crate]
+
+
+def stable_version(crate):
+    try:
+        metadata = json.loads(get_bytes(f"https://crates.io/api/v1/crates/{crate}"))
+        version = metadata["crate"]["max_stable_version"]
+    except (ValueError, TypeError, KeyError) as error:
+        raise BootstrapError(f"Invalid stable crate metadata for {crate}") from error
+    if not isinstance(version, str) or not re.fullmatch(r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)", version):
+        raise BootstrapError(f"Invalid stable crate version for {crate}")
+    return version
 
 
 def executable_version(output):
@@ -174,26 +188,33 @@ def install_tool(ctx, tool, *, publish=True, migrating=False):
         raise BootstrapError(f"Unmanaged replacement {name} installation preserved")
     if present:
         crate_state(ctx, tool)
+    intended = None
     if not present or ctx.args.update:
+        intended = stable_version(name)
         ctx.status("UPDATE" if present else "INSTALL", name)
-        arguments = update_argv(ctx, name)
+        arguments = update_argv(ctx, name, intended)
         if not present:
             arguments.insert(1, "--force")  # repair missing owned binaries despite old Cargo metadata
-        result = ctx.run(arguments, check=False)
-        if result:
-            # A network/server failure must not be disguised as a source fallback.
-            # Resolve the stable crate version explicitly, then try a locked build.
-            metadata = json.loads(get_bytes(f"https://crates.io/api/v1/crates/{name}"))
-            version = metadata["crate"]["max_stable_version"]
-            if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
-                raise BootstrapError(f"Invalid stable crate version for {name}")
-            ctx.status("INSTALL", name, "binary unavailable; locked source fallback with required build dependencies")
+        result = cargo_binary.attempt(ctx, arguments, paths)
+        ctx.status("VERIFY" if result.reason == "binary installed" else "FALLBACK", name,
+                   f"{result.reason}; version {intended}; {result.elapsed:.3f}s")
+        if result.reason != "binary installed":
+            ctx.status("INSTALL", name, "locked source fallback with required build dependencies")
             apt.ensure(ctx, ctx.config["apt"]["cargo_source"], update=False)
-            ctx.run([ctx.home / ".cargo/bin/cargo", "install", "--locked", "--version", version,
-                     *( ["--force"] if present else []), name])
+            # Match cargo-binstall's own source-build credential boundary.
+            env = {key: value for key, value in ctx.env.items() if key not in ("GITHUB_TOKEN", "GH_TOKEN")}
+            started = time.monotonic()
+            ctx.run([ctx.home / ".cargo/bin/cargo", "install", "--locked", "--version", intended,
+                     *( ["--force"] if present or (not migrating and name in ctx.receipts) else []), name], env=env)
+            elapsed = time.monotonic() - started
+            ctx.status("VERIFY", name, f"locked source fallback version {intended}; {elapsed:.3f}s")
+            with ctx.log_path.open("a") as log:
+                log.write(f"bootstrap: locked source fallback {name} version {intended}; elapsed {elapsed:.3f}s\n")
     else:
         ctx.status("FOUND", name)
     version = crate_state(ctx, tool)
+    if intended is not None and version != intended:
+        raise BootstrapError(f"{name} Cargo version mismatch: {version} != intended {intended}")
     for path in paths:
         regular(path)
         if not path.stat().st_mode & 0o111:

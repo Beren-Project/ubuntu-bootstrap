@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import pty
 import pwd
+import re
 import select
 import subprocess
 import sys
@@ -292,8 +293,34 @@ def base():
     self_update = log.index("rustup self update", init)
     stable = log.index("rustup toolchain install stable", self_update)
     assert init < self_update < stable
+    cargo_resolution_policy(log)
     completions()
     print("OK base: real installers, ownership, exact selective restore, pinned plugins, excluded files, No shell path")
+
+
+def cargo_resolution_policy(log):
+    import shlex
+    versions = {}
+    attempts = 0
+    for line in log.splitlines():
+        if not line.startswith((f"$ {HOME}/.cargo/bin/cargo-binstall ", f"$ {HOME}/.cargo/bin/cargo ")):
+            continue
+        args = shlex.split(line[2:])
+        if args[0] == str(HOME / ".cargo/bin/cargo-binstall") and "--strategies" in args:
+            assert args[args.index("--strategies") + 1] == "crate-meta-data"
+            assert "--no-discover-github-token" in args
+            assert "--json-output" in args and "--log-level" in args
+            assert args[args.index("--maximum-resolution-timeout") + 1] == "15"
+            version = args[args.index("--version") + 1]
+            assert re.fullmatch(r"=\d+\.\d+\.\d+", version)
+            versions[args[-1]] = version[1:]
+            attempts += 1
+        elif args[:2] == [str(HOME / ".cargo/bin/cargo"), "install"] and "--path" not in args:
+            assert "--locked" in args
+            assert args[args.index("--version") + 1] == versions[args[-1]]
+    assert attempts
+    assert "bootstrap: binary installed; binary attempt elapsed" in log
+    print(f"OK {attempts} real binary attempts: no credential discovery, exact versions and controlled fallback policy")
 
 
 def prompt(answer):
@@ -548,11 +575,22 @@ def recovery_regressions():
     print("OK deterministic publication and migration recovery regressions in Ubuntu")
 
 
-action = sys.argv[1]
-if action == "snapshot":
-    (HOME / "bootstrap-snapshot.json").write_text(json.dumps(fingerprint(), sort_keys=True))
-elif action == "repeat":
-    assert json.loads((HOME / "bootstrap-snapshot.json").read_text()) == fingerprint(), "Idempotency changed files, receipts, or backups"
-    print("OK second pass: unchanged versions, config mtimes, receipts and backup inventory")
-else:
-    globals()[action]()
+def cargo_retry_regressions():
+    run("/usr/bin/python3", "-B", "-m", "unittest", "discover", "-s", "/workspace/tests", "-p", "test_cargo_binary.py", "-v")
+    cargo_resolution_policy((STATE / "bootstrap.log").read_text())
+    print("OK deterministic quota/network/integrity, process cleanup and exact-version fallback regressions in Ubuntu")
+
+
+def main():
+    action = sys.argv[1]
+    if action == "snapshot":
+        (HOME / "bootstrap-snapshot.json").write_text(json.dumps(fingerprint(), sort_keys=True))
+    elif action == "repeat":
+        assert json.loads((HOME / "bootstrap-snapshot.json").read_text()) == fingerprint(), "Idempotency changed files, receipts, or backups"
+        print("OK second pass: unchanged versions, config mtimes, receipts and backup inventory")
+    else:
+        globals()[action]()
+
+
+if __name__ == "__main__":
+    main()
