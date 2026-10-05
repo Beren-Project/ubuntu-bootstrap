@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       integration:
-        description: Run the full Ubuntu 26.04 Podman installation test
+        description: Run full Ubuntu 26.04 qualification (all profiles, fresh Podman container)
         type: boolean
         default: false
 
@@ -15,17 +15,23 @@ permissions:
 
 jobs:
   unit:
+    name: Host-independent units and platform-gate logic
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y zsh
-      - run: ./scripts/test
+      - name: Run regressions and fixture-based platform-gate tests
+        run: ./scripts/test
   integration:
-    if: github.event_name == 'workflow_dispatch' && inputs.integration
+    name: Ubuntu 26.04 qualification (all profiles, Podman)
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.integration)
     needs: unit
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y podman
-      - run: ./scripts/test-podman
+      - name: Run real Ubuntu 26.04 bootstrap qualification
+        run: ./scripts/test-podman --scenario all

@@ -9,8 +9,10 @@ limits are recorded in the evidence document.
 
 ## Development prerequisites
 
-For local checks, use the target's system `/usr/bin/python3` and Zsh. The Python
-modules use the standard library; there is no pip dependency installation.
+For local checks, use system `/usr/bin/python3` and Zsh. The suite was verified
+with Python 3.12 on Ubuntu 24.04 and Python 3.14 on Ubuntu 26.04; the test host
+need not be the production installation target. The Python modules use the
+standard library; there is no pip dependency installation.
 `./scripts/test` requires Zsh because completion tests execute real syntax and
 autoload checks. ShellCheck runs when it is available; record if it was absent.
 The local suite needs neither sudo nor network access and uses temporary fixture
@@ -77,8 +79,94 @@ the full script before handoff:
 
 Passing these checks does not establish fresh Ubuntu installation or live WSL
 terminal qualification. Record exactly which checks ran and any limitations.
-The hosted [GitHub Actions workflow](.github/workflows/tests.yml) runs the local
-suite; configuration alone is not evidence that a hosted job passed.
+The hosted [GitHub Actions workflow](.github/workflows/tests.yml) separates the
+local suite from real installation qualification as described below;
+configuration alone is not evidence that a hosted job passed.
+
+## CI meanings and triggers
+
+| Result | Exact meaning |
+| --- | --- |
+| **Unit CI passed** | Host-independent regression coverage passed: logic, ownership, migration, recovery, state machines and completion behavior. This requires Python/Zsh, but does not qualify the host distribution for production installation. |
+| **Platform-gate tests passed** | Platform decision logic passed against explicit release/architecture fixtures, including Ubuntu 26.04 acceptance and unsupported-release rejection. These tests are part of the unit job, not installation evidence. |
+| **Ubuntu 26.04 qualification passed** | The real bootstrap ran successfully as a normal user in a fresh Ubuntu 26.04 environment, with real platform detection and the full `all` scenario. This is the platform-support qualification gate. |
+
+The `unit` job, displayed as **Host-independent units and platform-gate logic**,
+runs `./scripts/test` on GitHub-hosted `ubuntu-24.04`. Unrelated logic tests
+isolate platform detection, including the CLI completion-failure regression in
+[test_completions.py](tests/test_completions.py). Explicit `PlatformTests` in
+[test_logic.py](tests/test_logic.py) exercise the real detector with fixture
+files. A passing Ubuntu 24.04 unit job must never be described as Ubuntu 26.04
+qualification; production still rejects Ubuntu 24.04.
+
+The `integration` job, displayed as **Ubuntu 26.04 qualification (all profiles,
+Podman)**, also uses a GitHub-hosted `ubuntu-24.04` orchestration host. It runs
+`./scripts/test-podman --scenario all` against the real
+`docker.io/library/ubuntu:26.04` userspace, without mocking platform detection.
+The orchestration host is not the installation target.
+
+| Event | Unit job | Ubuntu 26.04 qualification |
+| --- | --- | --- |
+| Other branch/tag push, or pull request (including into `main`) | Runs | Skipped |
+| Push to `main` | Runs | Runs after units pass |
+| `workflow_dispatch`, `integration=false` (default) | Runs | Skipped |
+| `workflow_dispatch`, `integration=true` | Runs | Full run after units pass on the selected ref |
+
+This is post-push qualification of `main`, not a pre-merge installation check.
+A failed unit job prevents qualification. No reused container or interactive
+debug retry is requested by CI; qualification failure remains a failure.
+
+### Qualification environment choice and cost
+
+Retain the Ubuntu 24.04 host plus Ubuntu 26.04 Podman path. It reproduces the
+already-qualified local command and preserves the existing resource discipline.
+The full run covers base installation, all optional profiles, second-pass
+preservation, migration/recovery, real tool smoke checks and scoped updates.
+
+| Consideration | Ubuntu 24.04 host + Podman 26.04 | Direct native GitHub-hosted Ubuntu 26.04 |
+| --- | --- | --- |
+| Meaning | Fresh minimal 26.04 userspace installation with real detection | Real 26.04 host/kernel, but preinstalled tools can mask fresh-install behavior |
+| Reproducibility | Same image/setup/harness locally and in CI | Hosted inventory changes; direct fixtures would need adaptation |
+| Isolation | Container-local HOME, normal user, read-only repository mount | Disposable VM, with installation into runner account/system |
+| Runtime | Image/setup overhead; downloads and builds dominate | Could avoid container setup; no measured speed advantage |
+| Maintenance | Existing harness unchanged | Separate direct-run setup and checks required |
+| Runner maturity | Established explicit 24.04 orchestration label | Newer 26.04 image; maturity alone does not improve installation coverage |
+| Cleanup | Per-run container ownership, signal/finally cleanup, before/after audits | VM disposal isolates jobs but does not retain the existing resource audit |
+| Local similarity | Exact existing qualification command | Separate reproduction path |
+
+As checked on 2026-10-05, GitHub reports that native Ubuntu 26.04 runners
+[left public preview on 2026-09-17](https://github.blog/changelog/2026-09-17-ubuntu-26-generally-available-and-latest-migration/).
+While in preview, image stability would be an additional concern; the current
+choice rests on fresh-install isolation and reuse, not an outdated preview claim.
+Changing only the orchestration host to 26.04 while retaining Podman offers no
+demonstrated additional qualification signal.
+
+The [2026-10-05 dotfiles qualification](docs/VALIDATION.md#dotfiles-cargo-ownership-alignment--2026-10-05)
+took 592.42 seconds (9.9 minutes); earlier full runs took up to 2331.14 seconds
+(38.9 minutes). That longest run preceded the
+[Cargo retry guard](docs/CARGO_RETRY_2026-10-03.md#validation-evidence), whose
+fresh qualification took 722.45 seconds (12 minutes). The latest
+[local Ubuntu 26.04 qualification](docs/VALIDATION.md#ci-semantics--2026-10-05) took 580.10
+seconds (9.7 minutes). These are local observations, not hosted timing promises.
+Units take tens of seconds locally. Each successful unit run on a push to `main`
+now adds one full installation job, bounded by its existing 45-minute timeout;
+branch/PR cost is unchanged. Cold downloads, source fallbacks, upstream service
+failures and hosted CPU/memory/disk limits can slow or fail qualification. The
+45-minute hosted budget still needs confirmation from actual Actions runs.
+
+A base-only automatic run would still execute real 26.04 installation, but lose
+optional-profile installation and smoke tests, all-profile second-pass checks,
+legacy migration/recovery regressions and scoped all-profile update coverage.
+Keep `all` on `main` rather than silently reducing that assurance. No additional
+caching, retry policy or installer path is introduced.
+
+The Ubuntu image tag and latest-stable tool channels are mutable, so this is a
+repeatable environment/setup rather than a bit-for-bit pinned installation.
+Containers share the orchestration host's kernel: this gate qualifies x86_64
+Ubuntu 26.04 userspace bootstrap behavior, not a native 26.04 kernel, ARM64,
+desktop, or live WSL/Wayland/terminal session.
+
+## Pinned-dotfiles shell probes
 
 The integration suite also runs [pinned-dotfiles shell probes](tests/dotfiles_shell_checks.py)
 against the verified checkout. To run them separately with a clean checkout at

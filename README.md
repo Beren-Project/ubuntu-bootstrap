@@ -126,11 +126,21 @@ Juliaup's native integration. Tools without a supported provider report
 - [Validation evidence](docs/VALIDATION.md): dated results and qualification limits.
 
 Run `./scripts/test` for the normal suite (system Python and Zsh required).
+**Unit CI passed** means host-independent regression coverage passed;
+**platform-gate tests passed** means release/architecture decision logic passed.
+The Ubuntu 24.04 hosted unit job does not qualify Ubuntu 26.04 support.
+
 `./scripts/test-podman` installs inside an isolated Ubuntu 26.04 container and
 needs Podman, network access and several GB of resources; read
 [Contributing](CONTRIBUTING.md) before using it. Historical all-profile and
 focused completion qualifications are separate records; documentation checks
 are not fresh-install qualification.
+
+**Ubuntu 26.04 qualification passed** means the real bootstrap succeeded in a
+fresh Ubuntu 26.04 environment with real platform detection. CI runs the full
+Podman qualification after units on pushes to `main`; other branch pushes and PRs run
+units only. Manual dispatch can also request the full run. See
+[CI meanings, triggers and environment choice](CONTRIBUTING.md#ci-meanings-and-triggers).
 
 This project starts **inside Ubuntu**. Windows/WSL provisioning, Windows
 packages, fonts, host/network configuration and personal project environments

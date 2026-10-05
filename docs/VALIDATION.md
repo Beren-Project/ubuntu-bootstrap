@@ -4,7 +4,9 @@ This is a dated evidence index, not a promise that every scenario ran at the
 current revision. Earlier records retain their historical pins, ownership
 layouts and limitations. The core and completion implementations were
 subsequently committed by the user after their implementation agents finished
-without committing or pushing.
+without committing or pushing. Commit/worktree descriptions are snapshots at
+each dated handoff, not claims
+about the current checkout's Git state.
 
 The [2026-10-03 maintenance design](MAINTENANCE_2026-10-03.md) supersedes the
 inline-inventory and exception-only publication debts described in older
@@ -15,13 +17,34 @@ records. It describes the current schema, ownership and recovery state machines.
 | [Core qualification — 2026-10-01](#core-qualification--2026-10-01) | Original core implementation, subsequently committed as `ec3df7f` | 35 tests plus static checks | Fresh x86_64 Ubuntu 26.04, all profiles, 1000.62 s |
 | [Completion follow-up — 2026-10-02](#completion-follow-up--2026-10-02) | Completion implementation, subsequently committed as `f5e841a` | 51 tests plus static checks | Fresh x86_64 Ubuntu 26.04, focused base scenario, 233.28 s |
 | [Documentation follow-up — 2026-10-02](#documentation-follow-up--2026-10-02) | Documentation-only changes on `f5e841a`; implementation unchanged | 51 tests plus static and documentation checks | No installation run; earlier qualification unchanged |
+| [Optional completion follow-up — 2026-10-02](#optional-completion-follow-up--2026-10-02) | Optional-provider implementation on `0883eed` | 72 tests plus static/documentation checks | Fresh x86_64 Ubuntu 26.04, all profiles, 593.25 s; no retry |
+| [Optional-completion precommit review — 2026-10-02](#optional-completion-precommit-review--2026-10-02) | Provider registration and publication corrections | 87 tests plus static/documentation checks | Final fresh x86_64 Ubuntu 26.04, all profiles, 637.13 s; no retry |
 | [Cargo ownership and durable recovery — 2026-10-03](#cargo-ownership-and-durable-recovery--2026-10-03) | Coordinated maintenance on clean `0a19f52`; uncommitted | 113 tests plus static/documentation checks | Final fresh x86_64 Ubuntu 26.04, all profiles, 2331.14 s |
+| [Cargo retry follow-up — 2026-10-03](CARGO_RETRY_2026-10-03.md#validation-evidence) | Retry supervision on clean `384260c`; includes later log-only hardening | 133 tests plus static checks | Final fresh x86_64 Ubuntu 26.04, all profiles, 722.45 s; later log-only changes covered by units |
 | [Dotfiles Cargo ownership alignment — 2026-10-05](#dotfiles-cargo-ownership-alignment--2026-10-05) | Update on clean `f5a20fc`; uncommitted | 136 tests plus isolated pinned-shell probes and static checks | Fresh x86_64 Ubuntu 26.04, all profiles, 592.42 s; no retry |
+| [CI semantics — 2026-10-05](#ci-semantics--2026-10-05) | Workflow/documentation update on clean `c7dca58`; uncommitted; runtime/tests unchanged | 136 tests on local 26.04 and container 24.04; workflow/static/documentation checks | Fresh x86_64 Ubuntu 26.04, all profiles, 580.10 s; no retry; real 24.04 production rejection |
+| [Documentation precommit review — 2026-10-05](#documentation-precommit-review--2026-10-05) | All ten Markdown files reviewed with the pending CI patch | Manifest/CLI/implementation cross-checks, local links and example syntax | No new installation run; preceding CI qualification inputs unchanged |
 
 The focused completion run did not reinstall the all-profile engineering
 baseline. New documentation verification belongs in a separate dated record;
 it does not extend installation qualification. Contributor commands and
 resource discipline are described in [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+## CI evidence terminology
+
+**Unit CI passed** means host-independent regression coverage passed.
+**Platform-gate tests passed** means release/architecture decision logic passed
+against explicit fixtures, including supported acceptance and unsupported
+rejection. Both run in the Ubuntu 24.04 hosted unit job; neither result qualifies
+Ubuntu 26.04 installation support.
+
+**Ubuntu 26.04 qualification passed** means the real bootstrap successfully ran
+in a fresh Ubuntu 26.04 environment with real platform detection. The full
+Podman `all` scenario is the platform-support qualification gate, automatically
+requested after passing units on pushes to `main`, or manually with the
+dispatch integration input. See [CI meanings and triggers](../CONTRIBUTING.md#ci-meanings-and-triggers)
+for environment choice, runtime tradeoffs and container qualification limits.
+Historical local records below are not evidence of hosted Actions execution.
 
 ## Core qualification — 2026-10-01
 
@@ -699,3 +722,82 @@ No host-user bootstrap or live configuration restore was performed. ARM64
 installation, live WSL terminal/browser behavior and hosted Actions were not
 qualified. Final review found no further changes needed. Nothing was staged,
 committed or pushed; HEAD remains `f5a20fc`.
+
+## CI semantics — 2026-10-05
+
+Baseline: clean `c7dca58`, including the unit-test platform-isolation fix.
+Only the Actions workflow and documentation change. Production Ubuntu 26.04
+gates, manifest, unit fixtures and Podman qualification/cleanup machinery are
+unchanged. The workflow retains its `unit` and `integration` job IDs and Ubuntu
+24.04 orchestration hosts, with explicit display names and the full
+`./scripts/test-podman --scenario all` command. Qualification is now requested
+after units on pushes to `main`, while manual opt-in remains available.
+See [the trigger and environment comparison](../CONTRIBUTING.md#ci-meanings-and-triggers).
+
+### Validation performed
+
+- Local `./scripts/test`: **136 tests in 19.451 seconds**, no failures or skips,
+  plus manifest, Python AST, shell syntax and ShellCheck checks.
+- The same command in a disposable real Ubuntu 24.04 container: **136 tests in
+  22.864 seconds**, no failures or skips, plus the same static checks. This is
+  host-independent regression evidence, not Ubuntu 26.04 qualification.
+- In that Ubuntu 24.04 container, the unmodified `./bootstrap --non-interactive
+  --no-change-shell` exited 1 with `Only Ubuntu 26.04 (resolute) is supported`,
+  before creating bootstrap state. The real Python detector independently
+  rejected the actual `/etc/os-release`. Explicit unit fixtures still exercise
+  supported 26.04/architectures and unsupported-release/codename/architecture
+  decisions.
+- `actionlint` **1.7.11** accepted the workflow. Parsed workflow checks covered
+  main/branch/tag pushes, PRs, manual opt-in/default, commands, timeout and unit
+  dependency; qualification is skipped unless the triggering condition and
+  successful unit dependency both hold.
+- `./scripts/test-podman --scenario all`: **exit 0 in 580.10 seconds**, fresh
+  x86_64 Ubuntu 26.04 container, real bootstrap/platform detection, all profiles,
+  no reuse or retry. Final failed/skipped profile lists are empty. The run
+  includes base/all-profile preservation, pinned-shell probes, optional-tool
+  smoke checks, migration/recovery regressions and scoped update ownership.
+- Local Markdown file/anchor checks and `git diff --check` passed.
+
+### Resource audit and limits
+
+Both disposable probes ran sequentially under the fixed project container name,
+with unique per-run labels, a read-only repository mount and container-local
+normal-user homes. Only their session-created full container IDs were removed.
+The unchanged integration runner performed its normal before/after audits;
+independent comparison also confirms **seven unrelated stopped containers,
+twelve images, two volumes and three networks** are preserved. Container
+states, exit codes, timestamps, ports and attachments match. Original image
+identities/tags/digests remain; volume metadata and network configuration match
+(excluding the built-in Podman network's read-varying diagnostic `created`
+field). There are no running or project containers and no global prune ran.
+All **36 frozen runtime, manifest, script and test inputs** remain unchanged.
+
+Ignored `test-results/ci-semantics-20261005/` preserves both probe outputs,
+session inventories, qualification receipts/log/status, input hashes and the
+final resource audit. No host-user bootstrap was applied. These commands were
+exercised locally; neither the GitHub-hosted Ubuntu 24.04 unit job nor the new
+automatic hosted qualification was executed in this session. Hosted runtime,
+45-minute budget, and runner-kernel behavior still require actual Actions
+evidence. ARM64 and live WSL/desktop qualification remain outside this run.
+Nothing was staged, committed or pushed.
+
+## Documentation precommit review — 2026-10-05
+
+Reviewed all ten Markdown files against the current manifest, CLI, runtime,
+test architecture, workflow and preserved qualification evidence. Corrected
+README branch-trigger wording, replaced the unqualified Python 3.11 minimum
+claim with the verified test environments, completed the dated evidence index,
+and identified the longest historical run as preceding the Cargo retry guard.
+Historical pins, measurements, implementation contracts and Git snapshots remain
+dated; they were not rewritten as current results.
+
+Checks passed for **100 local file/anchor links**, **22 shell example blocks**
+(syntax only), **54 package/tool identifiers**, **16 public CLI flags**,
+the exact dotfiles pin/five-file selection and **14 profile dependency edges**.
+`git diff --check` passed, and all **36 qualified runtime, manifest, script and
+test inputs** remain unchanged. The approved workflow is also unchanged by
+this documentation review. No unit or installation tests were repeated;
+the preceding 136-test results, actual Ubuntu 24.04
+rejection and 580.10-second fresh Ubuntu 26.04 qualification remain the relevant
+evidence. External link availability and browser-rendered documentation were
+not rechecked. Nothing was staged, committed or pushed.
