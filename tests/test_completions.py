@@ -213,7 +213,18 @@ else:
         def provision(ctx, profile):
             if profile == "nvim":
                 raise BootstrapError("optional generator failure")
+        read_text = Path.read_text
+
+        def fixture_read_text(path, *args, **kwargs):
+            self.assertNotEqual(path, Path("/etc/os-release"),
+                                "CLI unit tests must mock platform detection, not read the host release")
+            return read_text(path, *args, **kwargs)
+
         with ExitStack() as stack:
+            stack.enter_context(patch.object(Path, "read_text", fixture_read_text))
+            stack.enter_context(patch("bootstrap_lib.cli.invoking_user", return_value=(self.ctx.user, self.home)))
+            platform = stack.enter_context(patch("bootstrap_lib.cli.detect", return_value=self.ctx.arch))
+            stack.enter_context(patch("bootstrap_lib.cli.shutil.which", return_value="/usr/bin/sudo"))
             for path in ("apt.base", "rust.rust", "rust.cargo", "python.managed_python", "node.node", "dotfiles.dotfiles", "editors.nvim"):
                 stack.enter_context(patch("bootstrap_lib.cli." + path))
             stack.enter_context(patch("bootstrap_lib.cli.Context", return_value=self.ctx))
@@ -221,6 +232,8 @@ else:
             stack.enter_context(patch("bootstrap_lib.cli.shell.choose", return_value=None))
             stack.enter_context(patch("bootstrap_lib.cli.completions.provision", side_effect=provision))
             result = cli.main(["--non-interactive", "--no-change-shell", "--nvim"])
+        platform.assert_called_once()
         self.assertEqual(result, 1)
         final = json.loads((self.ctx.state / "last-run.json").read_text())
+        self.assertEqual(final["architecture"], self.ctx.arch)
         self.assertEqual(final["failed"], ["nvim completions"])
