@@ -92,7 +92,8 @@ class Context:
             raise BootstrapError("Refusing symlinked log")
         self.results = []
         self.apt_refreshed = False
-        self.env = {**os.environ, "PATH": f"{home}/.cargo/bin:{home}/.local/bin:{home}/.juliaup/bin:/usr/local/bin:/usr/bin:/bin",
+        # Construct exact entries; do not filter inherited paths by substring.
+        self.env = {**os.environ, "PATH": f"{home}/.cargo/bin:{home}/.local/bin:/usr/local/bin:/usr/bin:/bin",
                     "GIT_TERMINAL_PROMPT": "0", "UV_NO_MODIFY_PATH": "1"}
         if not defer_state:
             self.initialize_state()

@@ -265,6 +265,8 @@ def base():
     run("sha256sum", "--check", str(HOME / "excluded.sha256"))
     root = HOME / ".local/share/ubuntu-bootstrap/dotfiles" / CONFIG["dotfiles"]["revision"]
     assert run("git", "-C", str(root), "rev-parse", "HEAD") == CONFIG["dotfiles"]["revision"]
+    from dotfiles_shell_checks import check_shell_contract
+    check_shell_contract(root)
     for name in CONFIG["dotfiles"]["files"]:
         assert (HOME / name).read_bytes() == (root / "home" / name).read_bytes(), name
     from bootstrap_lib.config import restore_args
@@ -417,6 +419,8 @@ def failures():
 
 
 def engineering():
+    from dotfiles_shell_checks import check_shell_contract
+    check_shell_contract(HOME / ".local/share/ubuntu-bootstrap/dotfiles" / CONFIG["dotfiles"]["revision"])
     for package in CONFIG["apt"]["build"]:
         assert run("dpkg-query", "-W", "-f=${Status}", package) == "install ok installed"
     assert "ngspice-47" in run("/usr/local/bin/ngspice", "--version")
@@ -461,6 +465,7 @@ def update():
     assert run(str(binary)) == "unrelated-user-tool 0.1.0"
     assert "unrelated-user-tool" not in json.loads(RECEIPTS.read_text())
     run("sha256sum", "--check", str(HOME / "excluded.sha256"))
+    cargo_ownership(True)
     optional_completions()
     print("OK --update left unrelated Cargo application and excluded/personal configs untouched")
 
@@ -552,8 +557,11 @@ def legacy_migration():
             ctx.record("uv", [parent / "uv", parent / "uvx"], manager="uv")
     run(str(HOME / ".local/bin/uv"), "--version")
     assert run(str(HOME / ".juliaup/bin/julia"), "-e", "print(VERSION)") == julia_before
-    assert run("/usr/bin/zsh", "-lic", "whence -p uv") == str(HOME / ".local/bin/uv")
-    assert run("/usr/bin/zsh", "-lic", "whence -p julia") == str(HOME / ".juliaup/bin/julia")
+    # Legacy PATH is fixture input, not a responsibility of the new dotfiles.
+    legacy_env = {**ctx.env, "HOME": str(HOME), "ZDOTDIR": str(HOME),
+                  "PATH": f"{HOME}/.local/bin:{HOME}/.juliaup/bin:/usr/bin:/bin"}
+    assert run("/usr/bin/zsh", "-lic", "whence -p uv", env=legacy_env) == str(HOME / ".local/bin/uv")
+    assert run("/usr/bin/zsh", "-lic", "whence -p julia", env=legacy_env) == str(HOME / ".juliaup/bin/julia")
     run(BOOTSTRAP, "--non-interactive", "--no-change-shell", "--build", "--ngspice", "--openmodelica", "--vim", "--nvim", "--emacs", "--julia")
     cargo_ownership(True)
     for path in (".local/bin/uv", ".local/bin/uvx", ".juliaup/bin/juliaup", ".juliaup/bin/julia"):

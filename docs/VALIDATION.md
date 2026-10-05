@@ -16,6 +16,7 @@ records. It describes the current schema, ownership and recovery state machines.
 | [Completion follow-up — 2026-10-02](#completion-follow-up--2026-10-02) | Completion implementation, subsequently committed as `f5e841a` | 51 tests plus static checks | Fresh x86_64 Ubuntu 26.04, focused base scenario, 233.28 s |
 | [Documentation follow-up — 2026-10-02](#documentation-follow-up--2026-10-02) | Documentation-only changes on `f5e841a`; implementation unchanged | 51 tests plus static and documentation checks | No installation run; earlier qualification unchanged |
 | [Cargo ownership and durable recovery — 2026-10-03](#cargo-ownership-and-durable-recovery--2026-10-03) | Coordinated maintenance on clean `0a19f52`; uncommitted | 113 tests plus static/documentation checks | Final fresh x86_64 Ubuntu 26.04, all profiles, 2331.14 s |
+| [Dotfiles Cargo ownership alignment — 2026-10-05](#dotfiles-cargo-ownership-alignment--2026-10-05) | Update on clean `f5a20fc`; uncommitted | 136 tests plus isolated pinned-shell probes and static checks | Fresh x86_64 Ubuntu 26.04, all profiles, 592.42 s; no retry |
 
 The focused completion run did not reinstall the all-profile engineering
 baseline. New documentation verification belongs in a separate dated record;
@@ -616,3 +617,85 @@ preserved for operator inspection. Changed/unmanaged legacy launchers are
 preserved and refused. The migration test constructs verified equivalent legacy
 state rather than running the historical shell installers. ARM64 installation,
 live WSL/Wayland/terminal behavior and hosted Actions were not qualified here.
+
+
+## Dotfiles Cargo ownership alignment — 2026-10-05
+
+This approved update began on clean `f5a20fc`. The dotfiles pin advances from
+`c44e4b8c8299f2b05ee225678daead77bf5bfbd1` to
+`b0fecc41f00fa2423aaf22478f2cec98cdf15229`. Only the five existing Zsh/Git/tmux/
+Starship selections are restored; `.bashrc` and `.profile` remain excluded.
+The verified upstream delta and unchanged restore/plugin interfaces are recorded
+in [UPSTREAM.md](UPSTREAM.md#reviewed-dotfiles-ownership-and-path-delta-2026-10-05).
+
+Bootstrap removes the exact legacy Julia directory from its constructed
+subprocess PATH, with no substring/prefix filtering. Existing Cargo installers,
+receipt schemas and migration safeguards are retained. The legacy-migration test
+now supplies its old launcher PATH explicitly instead of requiring the new
+shell to inject it. Podman interrupted-create discovery requires the current
+invocation's unique label and full container IDs; existing containers, images,
+volumes and networks are not cleanup targets.
+
+### Local checks
+
+```sh
+./scripts/test
+/usr/bin/python3 -B tests/dotfiles_shell_checks.py /tmp/ubuntu-bootstrap-dotfiles-review-20261005
+git diff --check
+```
+
+The full local suite passed **136 tests in 19.369 seconds**, with no failures or
+skips, plus manifest loading, Python AST parsing, shell syntax and ShellCheck.
+All **87 local documentation links and anchors** also passed. The actual pinned
+shell probes passed with temporary HOME/ZDOTDIR/XDG roots, an explicit
+environment whitelist, controlled PATH/executable
+fixtures, and disabled global Zsh startup files. They cover all four Cargo
+launchers against conflicting local/legacy copies, obsolete helper sentinels,
+absence of Julia directory injection, similarly named inherited paths, Linux/
+Windows ordering, fresh/repeated/nested startup, Cargo environment absence,
+native Julia completion registration, and fnm success/failure.
+
+Three deliberate regressions were introduced only into disposable fixture
+copies: legacy uv helper sourcing, Julia directory injection, and local
+launchers preceding Cargo. The probes rejected all three. The reviewed source
+checkout and live user configuration remained unchanged.
+
+### Fresh qualification and resource preservation
+
+```sh
+./scripts/test-podman --scenario all
+```
+
+The fresh Ubuntu 26.04 x86_64 all-profile run passed with **exit 0 in 592.42
+seconds**, without a retry. The final run reports empty failed/skipped profile
+lists. All **36 frozen runtime, manifest, script and test inputs** still match.
+The full installation output, receipt snapshots and resource inventories are
+retained under ignored `test-results/qualification-20261005/`, including
+`final-audit.json` and the unique run identifier.
+
+The run exercised initial installation, base/all-profile second-pass
+preservation, exact selective restoration and untouched Bash/login files,
+real Cargo registry/version/launcher checks, default Node availability,
+isolated pinned-shell probes before and after Neovim installation, native
+Julia completions and generator failure/refresh, ngspice/OpenModelica/editor
+smoke tests, receipt-proven legacy migration with preserved Python/Julia runtime
+and channel state, recovery regressions, and scoped updates preserving an
+unrelated Cargo executable. No ownership/update policy changes were needed.
+
+Final resource identities match the baseline: **seven unrelated stopped
+containers, twelve images, two volumes and three networks** remain. Container
+states, timestamps, exit codes, attachments and ports are preserved, comparing
+unordered attachment lists as sets. Original image tags and digest observations
+remain; the normal Ubuntu image pull added one digest observation to the same
+existing image ID. Only the uniquely identified test container was removed;
+there are no running or project containers. No image, volume, network or global
+prune cleanup ran.
+
+Volume metadata and network configuration also match. The built-in `podman`
+network's diagnostic `created` field varies between consecutive read-only
+inventory calls, so that field is excluded from the configuration comparison.
+
+No host-user bootstrap or live configuration restore was performed. ARM64
+installation, live WSL terminal/browser behavior and hosted Actions were not
+qualified. Final review found no further changes needed. Nothing was staged,
+committed or pushed; HEAD remains `f5a20fc`.

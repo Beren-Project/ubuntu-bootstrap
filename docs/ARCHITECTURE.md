@@ -141,7 +141,7 @@ than deletion of existing trees.
 
 The dotfiles checkout must have the exact expected origin, clean working tree
 (including ignored files), full pinned HEAD
-`c44e4b8c8299f2b05ee225678daead77bf5bfbd1` and no index flags hiding changes
+`b0fecc41f00fa2423aaf22478f2cec98cdf15229` and no index flags hiding changes
 before upstream scripts execute. Bootstrap calls upstream dependency reporting,
 pinned plugin installation, then selective restore preview and apply using
 repeated `--file` arguments for `.zshrc`, `.zshenv`, `.gitconfig`, `.tmux.conf`
@@ -155,6 +155,14 @@ Starship TOML/prompt, Git pager, an isolated tmux server and pinned plugin
 checkouts. Optional dependency findings in a successful upstream report do not
 add excluded configs or make missing Zellij/Mermaid prerequisites fatal. Git
 identity in `~/.gitconfig.local` and account authentication remain user actions.
+
+The current pinned `.zshenv` normalizes Zsh's base PATH with Cargo ahead of
+inherited Linux/Windows entries, then optional `~/bin` and `~/.local/bin`.
+Interactive `.zshrc` adds the optional Neovim preference and current fnm
+multishell. Neither sources `~/.local/bin/env` nor injects `~/.juliaup/bin`;
+native Julia completions remain under `~/.julia/juliaup/`. Bootstrap's controlled
+subprocess PATH likewise omits the exact legacy Julia directory. No substring
+or prefix filtering is applied to paths. Bash/login configuration is not restored.
 
 After each successful application handler, the completion hook reads only that
 profile's manifest definitions. It uses secure, discoverable system completions

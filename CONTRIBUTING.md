@@ -80,6 +80,20 @@ terminal qualification. Record exactly which checks ran and any limitations.
 The hosted [GitHub Actions workflow](.github/workflows/tests.yml) runs the local
 suite; configuration alone is not evidence that a hosted job passed.
 
+The integration suite also runs [pinned-dotfiles shell probes](tests/dotfiles_shell_checks.py)
+against the verified checkout. To run them separately with a clean checkout at
+the manifest's exact revision:
+
+```sh
+/usr/bin/python3 -B tests/dotfiles_shell_checks.py /path/to/pinned-dotfiles-checkout
+```
+
+These probes use temporary HOME, ZDOTDIR and XDG directories, a whitelisted
+environment, and controlled executable/PATH fixtures. They check Cargo launcher
+precedence, absence of legacy uv helper sourcing and Julia PATH injection,
+inherited ordering, repeated/nested startup, native completion registration,
+and fnm success/failure. They never restore files into the host user's HOME.
+
 ## Real installation verification
 
 [test-podman](scripts/test-podman) runs the single-container integration harness.
@@ -113,7 +127,9 @@ evidence, not a new fresh-install qualification. `--debug-retry` permits an
 interactive retry in the same container; it does not create numbered replacements.
 When an `all` run resumes at `base` or `engineering`, a successful retry also
 finishes the remaining stages in that container, including update checks.
-Only container IDs created by that invocation are cleaned up. Do not substitute
+Only container IDs created by that invocation are cleaned up. Interrupted-create
+discovery requires a unique per-run label in addition to the fixed name, and
+uses full IDs. Borrowed containers never enter this cleanup list. Do not substitute
 global prune, broad cleanup or removal of unrelated images/volumes.
 
 Ignored `test-results/` contains the latest session audit, exit code, timing,

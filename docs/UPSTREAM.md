@@ -1,10 +1,10 @@
 # Installation authorities and reviewed pins
 
-Rust distribution interfaces, published uv/Juliaup crates and release layouts,
-and the new dotfiles pin were independently reviewed 2026-10-03. Completion
-interfaces retain their 2026-10-02 review; unrelated authorities retain their
-2026-10-01 review. Policies and immutable artifact inputs are centralized
-in [config/bootstrap.toml](../config/bootstrap.toml); this document records why
+Rust distribution interfaces, published uv/Juliaup crates and release layouts
+were independently reviewed 2026-10-03; the current dotfiles pin was reviewed
+2026-10-05. Completion interfaces retain their 2026-10-02 review; unrelated
+authorities retain their 2026-10-01 review. Policies and immutable artifact inputs
+are centralized in [config/bootstrap.toml](../config/bootstrap.toml); this document records why
 those methods were selected. Observed installation results and qualification
 limits are separate in [VALIDATION.md](VALIDATION.md).
 
@@ -20,7 +20,7 @@ limits are separate in [VALIDATION.md](VALIDATION.md).
 | OpenModelica | https://openmodelica.org/download/download-linux/ | Official signed resolute/stable repository; `--no-install-recommends omc` |
 | ngspice | https://ngspice.sourceforge.io/download.html and release `INSTALL` | Manual out-of-tree release build, normal-user staging, system publication |
 
-Dotfiles commit `c44e4b8c8299f2b05ee225678daead77bf5bfbd1` was inspected against
+Dotfiles commit `b0fecc41f00fa2423aaf22478f2cec98cdf15229` was inspected against
 its selective restore implementation and bootstrap contract. The selected paths
 are exactly `.zshrc`, `.zshenv`, `.gitconfig`, `.tmux.conf` and
 `.config/starship.toml`, using repeated upstream `--file` flags for preview/apply.
@@ -71,7 +71,7 @@ Missing providers are an explicit, nonfatal `unavailable` observation. A future
 trusted package provider can be discovered and qualified through installed
 inventories and `fpath`; no unofficial files or handwritten definitions are
 substituted. Pin-specific shell integration remains the responsibility of the
-reviewed [public dotfiles](https://github.com/Beren-Project/dotfiles-public/blob/c44e4b8c8299f2b05ee225678daead77bf5bfbd1/home/.zshrc).
+reviewed [public dotfiles](https://github.com/Beren-Project/dotfiles-public/blob/b0fecc41f00fa2423aaf22478f2cec98cdf15229/home/.zshrc).
 
 Inspected 2026-10-02 against official guidance/source and installed CLI help.
 Only application-provided stable generators are declared in `zsh_completions`
@@ -175,3 +175,27 @@ to comparison/public-sync reports and their tests: 10 files, 515 insertions,
 20 deletions. Selected configs, managed restore selection, restore implementation,
 dependency checker, plugin installer/pins, Cargo environment sourcing and Julia
 native sourcing are unchanged. The new renderer is not added to restore scope.
+
+## Reviewed dotfiles ownership and PATH delta (2026-10-05)
+
+The current pin is
+[`b0fecc41f00fa2423aaf22478f2cec98cdf15229`](https://github.com/Beren-Project/dotfiles-public/commit/b0fecc41f00fa2423aaf22478f2cec98cdf15229).
+It is two commits ahead of the previous `c44e4b8c8299f2b05ee225678daead77bf5bfbd1`:
+the ownership/PATH change `8a30b8c2dd6537b5260ef5ba179a2a1b31989e33`, followed
+by documentation clarification. The complete delta changes 11 files,
+410 insertions and 64 deletions.
+
+Of bootstrap's selected files, only `.zshenv` and `.zshrc` change. Zsh now
+prioritizes Cargo's binaries, retains inherited Linux/Windows relative ordering,
+and puts conditional personal/local directories last. Legacy uv helper sourcing
+and Juliaup directory injection are removed; interactive comments are enabled.
+fnm retains `--use-on-cd`, generates its environment before removing stale
+multishell PATH entries, and preserves that PATH if generation fails.
+The native Julia completion destination is unchanged.
+
+The dependency report now describes uv/uvx and Juliaup/Julia as Cargo-managed
+and stops checking obsolete installer helpers/directories. Restore implementation,
+manifest selection, plugin installer and plugin pins are unchanged. Upstream's
+`.bashrc` and `.profile` changes are deliberately not restored by bootstrap.
+The installers already use Cargo; no application installation, receipt schema
+or runtime-channel changes are required for this pin update.

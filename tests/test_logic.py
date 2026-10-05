@@ -56,7 +56,7 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(len(result), len(set(result)))
 
     def test_exact_pinned_five_file_selection(self):
-        self.assertEqual(self.config["dotfiles"]["revision"], "c44e4b8c8299f2b05ee225678daead77bf5bfbd1")
+        self.assertEqual(self.config["dotfiles"]["revision"], "b0fecc41f00fa2423aaf22478f2cec98cdf15229")
         expected = [".zshrc", ".zshenv", ".gitconfig", ".tmux.conf", ".config/starship.toml"]
         self.assertEqual(self.config["dotfiles"]["files"], expected)
         preview = restore_args(self.config)
@@ -119,6 +119,19 @@ class OwnershipTests(unittest.TestCase):
         self.home = Path(self.temporary.name)
         self.ctx = context(self.home)
         self.binary = self.home / "tool"
+
+    def test_controlled_path_has_no_legacy_julia_entry(self):
+        expected = [str(self.home / ".cargo/bin"), str(self.home / ".local/bin"),
+                    "/usr/local/bin", "/usr/bin", "/bin"]
+        self.assertEqual(self.ctx.env["PATH"].split(":"), expected)
+        self.assertNotIn(str(self.home / ".juliaup/bin"), self.ctx.env["PATH"].split(":"))
+        # Similar names within legitimate entries must survive unchanged.
+        home = self.home / ".juliaup/bin-tools"
+        home.mkdir(parents=True)
+        ctx = context(home)
+        self.assertEqual(ctx.env["PATH"].split(":"),
+                         [str(home / ".cargo/bin"), str(home / ".local/bin"),
+                          "/usr/local/bin", "/usr/bin", "/bin"])
 
     def test_missing_owned_component_is_installable(self):
         self.assertFalse(self.ctx.owned("tool", [self.binary]))

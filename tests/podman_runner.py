@@ -7,6 +7,7 @@ import signal
 import subprocess
 import sys
 import time
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 NAME = "ubuntu-bootstrap-integration"
@@ -24,6 +25,12 @@ def audit():
     return json.loads(run("ps", "-a", "--format", "json", capture=True).stdout)
 
 
+def discover_created(run_id):
+    # A fixed name/project label alone cannot prove this invocation created it.
+    return run("ps", "-a", "--no-trunc", "--filter", f"name=^{NAME}$", "--filter",
+               f"label={LABEL}.run={run_id}", "--format", "{{.ID}}", capture=True).stdout.split()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reuse", action="store_true", help="Inspect and reuse a matching project container; never delete a borrowed container")
@@ -33,6 +40,7 @@ def main():
     report_dir = ROOT / "test-results"
     report_dir.mkdir(exist_ok=True)
     created = []
+    run_id = uuid.uuid4().hex
     before, after = [], []
     started = time.time()
     exit_code = 1
@@ -64,6 +72,7 @@ def main():
             try:
                 identifier = run("run", "--detach", "--rm", "--name", NAME,
                     "--label", f"{LABEL}=integration", "--label", f"{LABEL}.release=26.04",
+                    "--label", f"{LABEL}.run={run_id}",
                     "--memory", "6g", "--cpus", "4", "-e", "CI=1",
                     "-v", f"{ROOT}:/workspace:ro", "docker.io/library/ubuntu:26.04", "sleep", "infinity", capture=True).stdout.strip()
                 created.append(identifier)
@@ -71,9 +80,7 @@ def main():
             finally:
                 # Cover an interruption after Podman creates but before stdout is consumed.
                 if not created:
-                    ids = run("ps", "-a", "--filter", f"name=^{NAME}$", "--filter",
-                              f"label={LABEL}=integration", "--format", "{{.ID}}", capture=True).stdout.split()
-                    created.extend(ids)
+                    created.extend(discover_created(run_id))
             run("exec", NAME, "bash", "-eu", "-c", "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends sudo && useradd -m -s /bin/bash engineer && printf 'engineer ALL=(ALL) NOPASSWD: ALL\\n' > /etc/sudoers.d/engineer && chmod 0440 /etc/sudoers.d/engineer")
         scenario, freshness = args.scenario, "reused" if matches else "fresh"
         while True:
@@ -114,7 +121,7 @@ def main():
             if any(identifier in remaining for identifier in created):
                 print("ERROR project container leaked", file=sys.stderr)
                 exit_code = 1
-            unrelated_before = {c["Id"] for c in before if LABEL not in c.get("Labels", {})}
+            unrelated_before = {c["Id"] for c in before} - set(created)
             if not unrelated_before.issubset(remaining):
                 print("ERROR unrelated container inventory changed", file=sys.stderr)
                 exit_code = 1
@@ -122,7 +129,7 @@ def main():
         except subprocess.CalledProcessError:
             exit_code = 1
         (report_dir / "podman-session.json").write_text(json.dumps({"exit_code": exit_code,
-            "scenario": args.scenario, "created": created, "before": before, "after": after,
+            "scenario": args.scenario, "run_id": run_id, "created": created, "before": before, "after": after,
             "seconds": round(time.time() - started, 2)}, indent=2) + "\n")
     return exit_code
 

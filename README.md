@@ -90,8 +90,11 @@ Unqualified ARM64 `dotfiles`, `ngspice`, `nvim` and `cargo-update` require opt-i
 Reruns preserve working owned tools. **First runs and reruns can back up and
 replace existing differing files among the five shared configs**; identical
 files create no backup. Dotfiles revision
-`c44e4b8c8299f2b05ee225678daead77bf5bfbd1` is consumed through upstream preview/apply
+`b0fecc41f00fa2423aaf22478f2cec98cdf15229` is consumed through upstream preview/apply
 with the same five explicit `--file` arguments and all upstream protections.
+The pinned Zsh configuration prioritizes Cargo-managed uv/uvx and Juliaup/Julia,
+without sourcing the legacy uv helper or adding the legacy Julia binary directory.
+Bash's `.bashrc` and `.profile` remain outside bootstrap's restore selection.
 
 `--update` updates selected owned channel-managed components; repeat optional
 flags for optional tools. It does not advance immutable source pins or update

@@ -140,7 +140,7 @@ binstall_urls = { amd64 = "https://github.com/JuliaLang/juliaup/releases/downloa
 
 [dotfiles]
 url = "https://github.com/Beren-Project/dotfiles-public.git"
-revision = "c44e4b8c8299f2b05ee225678daead77bf5bfbd1"
+revision = "b0fecc41f00fa2423aaf22478f2cec98cdf15229"
 files = [".zshrc", ".zshenv", ".gitconfig", ".tmux.conf", ".config/starship.toml"]
 
 [ngspice]
