@@ -155,12 +155,19 @@ than deletion of existing trees.
 
 The dotfiles checkout must have the exact expected origin, clean working tree
 (including ignored files), full pinned HEAD
-`b0fecc41f00fa2423aaf22478f2cec98cdf15229` and no index flags hiding changes
+`1da7fed6c6cd76f5ec2ba1007a7bf3e88cc682c5` and no index flags hiding changes
 before upstream scripts execute. Bootstrap calls upstream dependency reporting,
 pinned plugin installation, then selective restore preview and apply using
 repeated `--file` arguments for `.zshrc`, `.zshenv`, `.gitconfig`, `.tmux.conf`
 and `.config/starship.toml`. It does not substitute the upstream three-file
 `--profile shell` preset or implement a second restore.
+
+The pinned Zsh config loads fzf's embedded `--zsh` integration only with
+interactive ZLE and terminal stdin. It evaluates successfully generated output
+and discards failed output; diagnostics remain visible. No packaged example
+files or legacy integration fallback are required. Private-terminal fixtures
+verify generation and guards; container probes verify the real APT fzf with
+Starship and pinned plugins. Captured startup without terminal stdin skips fzf.
 
 Upstream restore protections and backups govern replacement. A rerun may back
 up and replace local edits to these selected shared files; unchanged files do

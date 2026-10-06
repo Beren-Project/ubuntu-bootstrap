@@ -113,7 +113,7 @@ credential discovery is disabled and values are redacted from its log. See
 | Managed CPython | `~/.local/bin/python`, `~/.local/bin/python3` | Stable user development interpreter launchers. | uv; `python` profile; receipt owner `python`. |
 | Node LTS | `node` in the fnm-selected environment | JavaScript runtime and managed LTS default. | fnm; `node` profile. |
 | Shared dotfiles | Configuration files | Configure Zsh, Git, tmux and Starship. | Pinned upstream `restore.py`; `dotfiles` profile. |
-| Standalone Zsh plugins | Shell integrations | Shared shell plugin integrations. | Pinned upstream `install_zsh_plugins.py`; [exact revision's plugin inventory](https://github.com/Beren-Project/dotfiles-public/blob/b0fecc41f00fa2423aaf22478f2cec98cdf15229/scripts/zsh-plugins.json). |
+| Standalone Zsh plugins | Shell integrations | Shared shell plugin integrations. | Pinned upstream `install_zsh_plugins.py`; [exact revision's plugin inventory](https://github.com/Beren-Project/dotfiles-public/blob/1da7fed6c6cd76f5ec2ba1007a7bf3e88cc682c5/scripts/zsh-plugins.json). |
 
 System Python is never the pip development environment. Project dependencies
 and environments remain user actions. Versions are channels, not new pins:
@@ -174,7 +174,7 @@ channel.
 
 ## Shared configuration and reruns
 
-Dotfiles revision **`b0fecc41f00fa2423aaf22478f2cec98cdf15229`** supplies only:
+Dotfiles revision **`1da7fed6c6cd76f5ec2ba1007a7bf3e88cc682c5`** supplies only:
 
 ```text
 .zshrc
@@ -198,6 +198,15 @@ Julia state and native completions remain under `~/.julia/juliaup/`.
 Inherited Linux/Windows PATH ordering is retained after Cargo, with conditional
 `~/bin` and `~/.local/bin` last; interactive fnm and Neovim preferences precede
 the base PATH. Existing Bash/login files are not overwritten by this update.
+
+fzf Zsh integration uses `fzf --zsh`, requiring fzf 0.48.0+ with that interface.
+It runs only during interactive startup with ZLE and terminal stdin. Packaged
+documentation/example files are not required. Missing fzf leaves the basic
+shell usable; failed generation discards its output and preserves stderr while
+startup continues. The dependency report checks command presence without
+executing fzf or certifying interface support. Bootstrap retains the Ubuntu APT
+package and adds no older-version fallback. See the
+[terminal verification procedure](HUMAN_TESTING.md#4-installed-zsh-inspect-the-interactive-environment).
 
 **First runs and reruns apply the five selected shared configs.** Existing
 differing selected files can be backed up under `~/.dotfiles-backups/` and
@@ -416,12 +425,12 @@ ownership changes or blanket adoption as recovery steps.
 
 With no bootstrap run active, inspect the exact machine-managed checkout named
 in the error as your normal user. This applies only to
-`${XDG_DATA_HOME:-$HOME/.local/share}/ubuntu-bootstrap/dotfiles/b0fecc41f00fa2423aaf22478f2cec98cdf15229`,
+`${XDG_DATA_HOME:-$HOME/.local/share}/ubuntu-bootstrap/dotfiles/1da7fed6c6cd76f5ec2ba1007a7bf3e88cc682c5`,
 not a development clone or a checkout under `zsh/plugins`. Review that path
 before using the example:
 
 ```sh
-bootstrap_checkout="${XDG_DATA_HOME:-$HOME/.local/share}/ubuntu-bootstrap/dotfiles/b0fecc41f00fa2423aaf22478f2cec98cdf15229"
+bootstrap_checkout="${XDG_DATA_HOME:-$HOME/.local/share}/ubuntu-bootstrap/dotfiles/1da7fed6c6cd76f5ec2ba1007a7bf3e88cc682c5"
 ls -ld "$bootstrap_checkout"
 git -C "$bootstrap_checkout" remote get-url origin
 git -C "$bootstrap_checkout" rev-parse HEAD
@@ -430,7 +439,7 @@ git -C "$bootstrap_checkout" ls-files -v
 ```
 
 Expected origin is `https://github.com/Beren-Project/dotfiles-public.git` and
-expected HEAD is `b0fecc41f00fa2423aaf22478f2cec98cdf15229`. Status must include
+expected HEAD is `1da7fed6c6cd76f5ec2ba1007a7bf3e88cc682c5`. Status must include
 ignored files; lowercase tags or `S` in `ls-files -v` indicate index flags that
 can hide changes. Preserve these findings for review. If the path is a symlink
 or is not an ordinary checkout, investigate that specific error before moving it.

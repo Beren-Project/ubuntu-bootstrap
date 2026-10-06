@@ -181,7 +181,18 @@ These probes use temporary HOME, ZDOTDIR and XDG directories, a whitelisted
 environment, and controlled executable/PATH fixtures. They check Cargo launcher
 precedence, absence of legacy uv helper sourcing and Julia PATH injection,
 inherited ordering, repeated/nested startup, native completion registration,
-and fnm success/failure. They never restore files into the host user's HOME.
+and fnm success/failure. Private terminal stdin additionally checks fzf-generated
+widget provenance and key bindings, failed/partial output, visible diagnostics,
+missing fzf, and interactive/ZLE/terminal guards. These fixture probes need no
+installed fzf. They never restore files into the host user's HOME.
+
+The base and engineering container checks separately use the real installed APT
+fzf with Starship and all pinned plugins. They require the four default fzf
+widgets and bindings, retain arrow/Shift+Enter bindings, and check quiet terminal
+and captured startup. They use explicit default fzf settings, independent of
+the orchestration host's environment. Registration checks do not establish the
+appearance or behavior of an actual interactive selection; use the
+[human inspection guide](docs/HUMAN_TESTING.md) for that pass.
 
 ## Real installation verification
 

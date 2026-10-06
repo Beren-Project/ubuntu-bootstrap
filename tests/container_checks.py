@@ -283,8 +283,9 @@ def base():
     run("sha256sum", "--check", str(HOME / "excluded.sha256"))
     root = HOME / ".local/share/ubuntu-bootstrap/dotfiles" / CONFIG["dotfiles"]["revision"]
     assert run("git", "-C", str(root), "rev-parse", "HEAD") == CONFIG["dotfiles"]["revision"]
-    from dotfiles_shell_checks import check_shell_contract
+    from dotfiles_shell_checks import check_installed_fzf, check_shell_contract
     check_shell_contract(root)
+    check_installed_fzf(HOME)
     for name in CONFIG["dotfiles"]["files"]:
         assert (HOME / name).read_bytes() == (root / "home" / name).read_bytes(), name
     from bootstrap_lib.config import restore_args
@@ -437,8 +438,9 @@ def failures():
 
 
 def engineering():
-    from dotfiles_shell_checks import check_shell_contract
+    from dotfiles_shell_checks import check_installed_fzf, check_shell_contract
     check_shell_contract(HOME / ".local/share/ubuntu-bootstrap/dotfiles" / CONFIG["dotfiles"]["revision"])
+    check_installed_fzf(HOME)
     for package in CONFIG["apt"]["build"]:
         assert run("dpkg-query", "-W", "-f=${Status}", package) == "install ok installed"
     assert "ngspice-47" in run("/usr/local/bin/ngspice", "--version")

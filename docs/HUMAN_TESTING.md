@@ -197,8 +197,28 @@ record the reason for skips and any differences from the baseline.
 | Prompt and startup | Zsh opens without startup errors; Starship prompt text is readable and expected glyphs render. Repeat the color samples. |
 | Command paths and runtimes | Cargo applications resolve from `~/.cargo/bin`; managed Python resolves from `~/.local/bin`; Node is available through fnm and matches its default. |
 | Tab completion | Type `uv --` and press Tab for option candidates, `vim /tmp/` for file candidates, and `julia +` for installed channel candidates. Clear each line with Ctrl+C rather than executing it. |
+| fzf selection | Verify the bindings below, then try Ctrl+R for history, Ctrl+T for files, Alt+C for directories, and type `ls **` followed by Tab for fuzzy completion. Cancel with Esc or Ctrl+C; record disabled bindings and unexpected behavior. |
 | Terminal editors | Vim, Neovim and Emacs open, accept navigation/input, redraw correctly and exit cleanly. Inspect their appearance; no editor theme is prescribed. |
 | Build and engineering tools | Version commands succeed; Julia arithmetic prints `2`. These basic probes supplement the automated numerical simulations. |
+
+Check fzf in this interactive terminal, where stdin is a terminal and ZLE is
+enabled. A captured `zsh -lic 'true'` deliberately skips fzf integration.
+
+```zsh
+fzf --version
+bindkey '^R'
+bindkey '^T'
+bindkey '^[c'
+bindkey '^I'
+print -- ${+widgets[fzf-history-widget]} ${+widgets[fzf-file-widget]} ${+widgets[fzf-cd-widget]} ${+widgets[fzf-completion]}
+```
+
+With fzf 0.48.0+ supporting `--zsh` and default settings, expect
+`fzf-history-widget`, `fzf-file-widget`, `fzf-cd-widget`, and `fzf-completion`,
+respectively, and `1 1 1 1`. An intentionally empty `FZF_CTRL_R_COMMAND`,
+`FZF_CTRL_T_COMMAND`, or `FZF_ALT_C_COMMAND` disables its corresponding binding.
+The config loads embedded integration rather than examples under
+`/usr/share/doc/fzf/`; absent documentation files do not prevent setup.
 
 Check paths and versions in the installed Zsh session:
 

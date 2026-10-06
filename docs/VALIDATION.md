@@ -26,6 +26,7 @@ records. It describes the current schema, ownership and recovery state machines.
 | [Documentation precommit review — 2026-10-05](#documentation-precommit-review--2026-10-05) | All ten Markdown files reviewed with the pending CI patch | Manifest/CLI/implementation cross-checks, local links and example syntax | No new installation run; preceding CI qualification inputs unchanged |
 | [Permissive-umask directory safety — 2026-10-05](#permissive-umask-directory-safety--2026-10-05) | Safe managed ancestry creation, installation-scoped umask and completion checks | 149 tests plus focused, static and documentation checks | Fresh x86_64 Ubuntu 26.04, all profiles, 577.68 s; verified caller umask 0002 |
 | [Human inspection documentation — 2026-10-06](#human-inspection-documentation--2026-10-06) | Interactive guide, navigation and dated timing correction; documentation only | Manifest/CLI cross-checks, local links and shell example syntax | No installation or visual inspection run |
+| [Portable fzf dotfiles update — 2026-10-06](#portable-fzf-dotfiles-update--2026-10-06) | Reviewed pin and terminal-based fzf probes on clean `2f79c21`; uncommitted | 149 tests, isolated pinned-shell/fzf probes, upstream focused tests and documentation checks | Fresh x86_64 Ubuntu 26.04, all profiles, 624.82 s; no retry |
 
 The focused completion run did not reinstall the all-profile engineering
 baseline. New documentation verification belongs in a separate dated record;
@@ -966,3 +967,89 @@ has no reproduced cause from this change. Terminal appearance, interactive
 command execution, browser rendering and repository-wide external-link
 availability were not rechecked. Runtime, manifest, workflow and tests remain
 unchanged; nothing was staged, committed or pushed.
+
+
+## Portable fzf dotfiles update — 2026-10-06
+
+This update began on clean `2f79c21`. The reviewed dotfiles pin advances from
+`b0fecc41f00fa2423aaf22478f2cec98cdf15229` to
+`1da7fed6c6cd76f5ec2ba1007a7bf3e88cc682c5`. The existing five-file selection,
+restore/plugin interfaces, ownership/update policies and CI workflow remain
+unchanged. The source comparison is recorded in
+[UPSTREAM.md](UPSTREAM.md#reviewed-portable-fzf-integration-2026-10-06).
+Only `.zshrc` changes among restored configs, adopting embedded `fzf --zsh`
+integration without a packaged-example dependency.
+
+### Local checks
+
+```sh
+./scripts/test
+/usr/bin/python3 -B tests/dotfiles_shell_checks.py /tmp/ubuntu-bootstrap-dotfiles-review-20261006
+git diff --check
+```
+
+The full local suite passed **149 tests in 20.357 seconds**, with no failures
+or skips, plus manifest loading, Python AST parsing, shell syntax and
+ShellCheck. Existing isolated Cargo/PATH/fnm probes passed against the verified
+new source checkout. New private-terminal-stdin fixtures passed generated
+function provenance, a single `--zsh` invocation, all four widgets/key bindings,
+failed/partial output rejection, visible generator/evaluation diagnostics,
+temporary-variable cleanup, later widget registration, missing fzf, and all
+interactive/ZLE/terminal guards. The same provenance check rejected the prior
+revision in a disposable copy, even with readable host example files.
+
+The verified upstream checkout separately passed its **five fzf tests** and
+**one dependency-report test** using `python3 -B`. Its working tree stayed clean,
+including ignored/untracked files. Real installed-tool assertions belong to
+the fresh container checks below. The host's live configuration was not changed.
+
+### Fresh qualification
+
+```sh
+./scripts/test-podman --scenario all
+```
+
+The fresh Ubuntu 26.04 x86_64 all-profile run passed with **exit 0 in 624.82
+seconds**, without reuse or retry. The final failed/skipped profile lists are
+empty. All **36 frozen runtime, manifest, script and test inputs** still match.
+Evidence is retained under ignored `test-results/qualification-20261006-fzf/`,
+including installation/local-test logs, receipts, resource inventories,
+`podman-session.json`, and `final-audit.json`.
+
+The container has **fzf 0.67.0 (debian)** and neither
+`/usr/share/doc/fzf/examples/completion.zsh` nor
+`/usr/share/doc/fzf/examples/key-bindings.zsh`. Real installed-fzf checks passed
+both after base installation and after optional tools were installed. All four
+widgets and Ctrl+R/Ctrl+T/Alt+C/Tab bindings were present with Starship and the
+pinned plugins; arrow/Shift+Enter bindings remained intact. Both terminal-stdin
+and captured startup were quiet. These finite probes use private terminal stdin
+with captured stdout/stderr; they verify registration, not interactive picker
+rendering or user selections.
+
+The full run also passed rerun preservation, selective restore with excluded/
+personal configs untouched, shell consent, native/generated completions,
+engineering numerical/tool smoke tests, receipt-proven migration, recovery
+regressions, and scoped updates preserving an unrelated Cargo application.
+The existing controlled locked-source fallback was used for cargo-update;
+no installation/update policy changed.
+
+The final resource inventory preserves the same **seven stopped unrelated
+containers, twelve images, two volumes and three networks**. Container state,
+start/exit timestamps, attachments and ports match; volume metadata and network
+configuration match. The built-in network's regenerated diagnostic timestamp
+was excluded from comparison. Original image identities, names and digest
+observations remain. Only this invocation's uniquely identified test container
+was removed; no image/volume/network/global prune cleanup ran.
+
+### Documentation and limits
+
+All **11 Markdown files**, **115 local links/anchors**, and **40 shell example
+blocks** (syntax only) passed verification. Current pin references and recovery
+examples match the manifest; dated historical pins/evidence remain intact.
+`git diff --check` passed. No runtime module, CLI, receipt schema, installer or
+workflow changed; nothing was staged, committed or pushed.
+
+Human terminal appearance and actual fzf selections, live WSL/Wayland behavior,
+ARM64, and hosted GitHub Actions were not checked. Repository-wide external-link
+availability and browser rendering were not rechecked. This is fresh x86_64
+Ubuntu 26.04 userspace qualification through the existing Podman harness.

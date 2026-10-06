@@ -57,7 +57,7 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(len(result), len(set(result)))
 
     def test_exact_pinned_five_file_selection(self):
-        self.assertEqual(self.config["dotfiles"]["revision"], "b0fecc41f00fa2423aaf22478f2cec98cdf15229")
+        self.assertEqual(self.config["dotfiles"]["revision"], "1da7fed6c6cd76f5ec2ba1007a7bf3e88cc682c5")
         expected = [".zshrc", ".zshenv", ".gitconfig", ".tmux.conf", ".config/starship.toml"]
         self.assertEqual(self.config["dotfiles"]["files"], expected)
         preview = restore_args(self.config)

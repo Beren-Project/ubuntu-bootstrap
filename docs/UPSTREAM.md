@@ -2,7 +2,7 @@
 
 Rust distribution interfaces, published uv/Juliaup crates and release layouts
 were independently reviewed 2026-10-03; the current dotfiles pin was reviewed
-2026-10-05. Completion interfaces retain their 2026-10-02 review; unrelated
+2026-10-06. Completion interfaces retain their 2026-10-02 review; unrelated
 authorities retain their 2026-10-01 review. Policies and immutable artifact inputs
 are centralized in [config/bootstrap.toml](../config/bootstrap.toml); this document records why
 those methods were selected. Observed installation results and qualification
@@ -20,7 +20,7 @@ limits are separate in [VALIDATION.md](VALIDATION.md).
 | OpenModelica | https://openmodelica.org/download/download-linux/ | Official signed resolute/stable repository; `--no-install-recommends omc` |
 | ngspice | https://ngspice.sourceforge.io/download.html and release `INSTALL` | Manual out-of-tree release build, normal-user staging, system publication |
 
-Dotfiles commit `b0fecc41f00fa2423aaf22478f2cec98cdf15229` was inspected against
+Dotfiles commit `1da7fed6c6cd76f5ec2ba1007a7bf3e88cc682c5` was inspected against
 its selective restore implementation and bootstrap contract. The selected paths
 are exactly `.zshrc`, `.zshenv`, `.gitconfig`, `.tmux.conf` and
 `.config/starship.toml`, using repeated upstream `--file` flags for preview/apply.
@@ -71,7 +71,7 @@ Missing providers are an explicit, nonfatal `unavailable` observation. A future
 trusted package provider can be discovered and qualified through installed
 inventories and `fpath`; no unofficial files or handwritten definitions are
 substituted. Pin-specific shell integration remains the responsibility of the
-reviewed [public dotfiles](https://github.com/Beren-Project/dotfiles-public/blob/b0fecc41f00fa2423aaf22478f2cec98cdf15229/home/.zshrc).
+reviewed [public dotfiles](https://github.com/Beren-Project/dotfiles-public/blob/1da7fed6c6cd76f5ec2ba1007a7bf3e88cc682c5/home/.zshrc).
 
 Inspected 2026-10-02 against official guidance/source and installed CLI help.
 Only application-provided stable generators are declared in `zsh_completions`
@@ -178,7 +178,7 @@ native sourcing are unchanged. The new renderer is not added to restore scope.
 
 ## Reviewed dotfiles ownership and PATH delta (2026-10-05)
 
-The current pin is
+The pin reviewed at this checkpoint was
 [`b0fecc41f00fa2423aaf22478f2cec98cdf15229`](https://github.com/Beren-Project/dotfiles-public/commit/b0fecc41f00fa2423aaf22478f2cec98cdf15229).
 It is two commits ahead of the previous `c44e4b8c8299f2b05ee225678daead77bf5bfbd1`:
 the ownership/PATH change `8a30b8c2dd6537b5260ef5ba179a2a1b31989e33`, followed
@@ -199,3 +199,29 @@ manifest selection, plugin installer and plugin pins are unchanged. Upstream's
 `.bashrc` and `.profile` changes are deliberately not restored by bootstrap.
 The installers already use Cargo; no application installation, receipt schema
 or runtime-channel changes are required for this pin update.
+
+## Reviewed portable fzf integration (2026-10-06)
+
+The current pin is
+[`1da7fed6c6cd76f5ec2ba1007a7bf3e88cc682c5`](https://github.com/Beren-Project/dotfiles-public/commit/1da7fed6c6cd76f5ec2ba1007a7bf3e88cc682c5),
+two commits ahead of `b0fecc41f00fa2423aaf22478f2cec98cdf15229`.
+The [complete comparison](https://github.com/Beren-Project/dotfiles-public/compare/b0fecc41f00fa2423aaf22478f2cec98cdf15229...1da7fed6c6cd76f5ec2ba1007a7bf3e88cc682c5)
+changes nine files, with 302 insertions and 21 deletions. The first commit,
+`35d8db5`, fixes portable fzf integration; the second clarifies documentation.
+
+Only `.zshrc` changes among bootstrap's selected configs. It calls `fzf --zsh`
+once when interactive ZLE, terminal stdin and command presence permit it, then
+evaluates only successfully generated output. Failed output is discarded,
+stderr remains visible, and the temporary variable is removed. fzf 0.48.0+
+with the embedded interface is required; there is no legacy-file fallback.
+This avoids container packaging exclusions of `/usr/share/doc/fzf/examples/`.
+The upstream dependency report describes this requirement without executing
+fzf and removes checks for those documentation paths.
+
+Restore implementation, managed selection, plugin installer/pins, the other
+four selected configs, Cargo/PATH integration, and native Julia completion
+sourcing are unchanged. Bootstrap keeps Ubuntu APT ownership of fzf and adds
+no package installer, receipt schema, runtime-channel or CLI change.
+New fixture checks prove generated widget provenance and guards; actual
+installed integration is checked separately in the base and engineering
+container scenarios. See [validation evidence](VALIDATION.md).
