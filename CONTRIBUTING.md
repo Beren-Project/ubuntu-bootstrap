@@ -145,9 +145,10 @@ The [2026-10-05 dotfiles qualification](docs/VALIDATION.md#dotfiles-cargo-owners
 took 592.42 seconds (9.9 minutes); earlier full runs took up to 2331.14 seconds
 (38.9 minutes). That longest run preceded the
 [Cargo retry guard](docs/CARGO_RETRY_2026-10-03.md#validation-evidence), whose
-fresh qualification took 722.45 seconds (12 minutes). The latest
-[local Ubuntu 26.04 qualification](docs/VALIDATION.md#ci-semantics--2026-10-05) took 580.10
-seconds (9.7 minutes). These are local observations, not hosted timing promises.
+fresh qualification took 722.45 seconds (12 minutes). The later
+[permissive-umask qualification](docs/VALIDATION.md#permissive-umask-directory-safety--2026-10-05)
+took 577.68 seconds (9.6 minutes). These are dated local observations, not hosted
+timing promises.
 Units take tens of seconds locally. Each successful unit run on a push to `main`
 now adds one full installation job, bounded by its existing 45-minute timeout;
 branch/PR cost is unchanged. Cold downloads, source fallbacks, upstream service
@@ -226,6 +227,16 @@ sessions, so preserve relevant evidence separately before another run. Inspect
 the before/after inventories and report unrelated resource states as well as
 project cleanup; the runner's automated unrelated-container check only proves
 that those IDs remain present.
+
+## Human inspection
+
+Follow [the human inspection guide](docs/HUMAN_TESTING.md) for a fresh interactive
+Podman session with all optional profiles. It separates host, container-root and
+normal-user commands, preserves terminal settings through login, and provides
+color samples plus prompt, completion, tmux, editor and engineering-tool checks.
+Export observations and bootstrap diagnostics before the `--rm` container exits.
+This complements the automated harness; a manual pass does not establish its
+ownership, recovery or update coverage or live WSL/Wayland qualification.
 
 ## Review and support evidence
 

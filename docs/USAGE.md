@@ -405,6 +405,7 @@ and shell choice; `--update` is not a generic repair switch.
 | Conflicting OpenModelica source | Exact managed and existing APT sources named in the error. | Review reconciliation; do not substitute an older Ubuntu suite. |
 | Interrupted system publication | Destination, `.ubuntu-bootstrap-new`, retained predecessors and command links. | Preserve artifacts for deliberate recovery. A failed final rename attempts to restore the predecessor. |
 | Clipboard or font issue | Installed binaries and current Wayland/terminal session. | Review session/font setup; container binary checks do not establish live WSL behavior. |
+| Eight colors or reduced terminal colors | Host/container/Zsh/tmux `TERM`, `COLORTERM`, selected terminfo and actual palette rendering. | Follow the [human color diagnostics](HUMAN_TESTING.md#color-diagnostics-and-eight-color-results); record the failing boundary before changing terminal settings. |
 
 For example, inspect a completion with `ls -ld ~/.zfunc`,
 `ls -l ~/.zfunc/_fnm` and `/usr/bin/zsh -n ~/.zfunc/_fnm`. After successful

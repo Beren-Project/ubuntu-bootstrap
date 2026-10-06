@@ -25,6 +25,7 @@ records. It describes the current schema, ownership and recovery state machines.
 | [CI semantics — 2026-10-05](#ci-semantics--2026-10-05) | Workflow/documentation update on clean `c7dca58`; uncommitted; runtime/tests unchanged | 136 tests on local 26.04 and container 24.04; workflow/static/documentation checks | Fresh x86_64 Ubuntu 26.04, all profiles, 580.10 s; no retry; real 24.04 production rejection |
 | [Documentation precommit review — 2026-10-05](#documentation-precommit-review--2026-10-05) | All ten Markdown files reviewed with the pending CI patch | Manifest/CLI/implementation cross-checks, local links and example syntax | No new installation run; preceding CI qualification inputs unchanged |
 | [Permissive-umask directory safety — 2026-10-05](#permissive-umask-directory-safety--2026-10-05) | Safe managed ancestry creation, installation-scoped umask and completion checks | 149 tests plus focused, static and documentation checks | Fresh x86_64 Ubuntu 26.04, all profiles, 577.68 s; verified caller umask 0002 |
+| [Human inspection documentation — 2026-10-06](#human-inspection-documentation--2026-10-06) | Interactive guide, navigation and dated timing correction; documentation only | Manifest/CLI cross-checks, local links and shell example syntax | No installation or visual inspection run |
 
 The focused completion run did not reinstall the all-profile engineering
 baseline. New documentation verification belongs in a separate dated record;
@@ -930,3 +931,38 @@ this change does not claim complete resistance to concurrent same-user/root
 path replacement or arbitrary storage/hardware failure, nor transactional
 recovery of third-party installer internals. Pre-existing unsafe paths remain
 an operator-review boundary.
+
+## Human inspection documentation — 2026-10-06
+
+Reviewed all documentation against the current manifest, entry point, CLI,
+shell-entry conditions, runtime environment, container harness, workflow and
+dated qualification records. Added [the human inspection guide](HUMAN_TESTING.md)
+with the supplied Ubuntu 26.04 interactive Podman procedure and all seven
+optional flags. It uses `/workspace`, explicit terminal-variable preservation
+through login, normal-user installation, terminal/palette comparisons, and
+prompt, completion, tmux, editor and engineering-tool checks. Evidence export
+precedes container exit because `--rm` removes container-local diagnostics.
+
+README and CONTRIBUTING now link the guide; usage troubleshooting links its
+eight-color diagnostics. CONTRIBUTING's timing comparison now points to the
+later 577.68-second permissive-umask qualification instead of calling the
+580.10-second CI-semantics run latest. Both measurements remain dated evidence.
+Historical pins, test results and handoffs were preserved.
+
+Documentation checks passed across **11 Markdown files**, **110 local
+links/anchors**, **37 shell example blocks** (syntax only), all **16 public CLI
+flags**, the exact five-file restore selection/current pin, default profiles
+and **14 profile dependency edges**. The new guide's **13 command blocks**
+also parse in both Bash and Zsh; its seven optional flags resolve all 13
+profiles. Login-variable preservation, the absolute mount path and evidence
+export ordering were checked against the implementation. `git diff --check`
+passed, including a separate whitespace check of the new guide. Changes are
+limited to five documentation files, with no staged changes.
+
+This is documentation verification, not an executed human inspection or new
+installation qualification. No bootstrap/installer, Podman lifecycle command,
+unit suite or hosted Actions run was performed. The earlier eight-color report
+has no reproduced cause from this change. Terminal appearance, interactive
+command execution, browser rendering and repository-wide external-link
+availability were not rechecked. Runtime, manifest, workflow and tests remain
+unchanged; nothing was staged, committed or pushed.

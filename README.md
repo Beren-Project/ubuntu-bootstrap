@@ -121,6 +121,8 @@ Juliaup's native integration. Tools without a supported provider report
 
 - [Usage](docs/USAGE.md): detailed inventory, flags, paths, updates and recovery.
 - [Contributing](CONTRIBUTING.md): contributor workflow and relevant checks.
+- [Human inspection](docs/HUMAN_TESTING.md): interactive Podman setup, color
+  diagnostics, prompt/completion, tmux and editor checks.
 - [Architecture](docs/ARCHITECTURE.md): ownership and failure boundaries.
 - [Upstream interfaces](docs/UPSTREAM.md): sources, pins and completion interfaces.
 - [Validation evidence](docs/VALIDATION.md): dated results and qualification limits.
