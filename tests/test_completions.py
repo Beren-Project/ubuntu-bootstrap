@@ -196,6 +196,26 @@ else:
         self.assertEqual(self.destination.parent.stat().st_mode & 0o777, 0o755)
         self.assertEqual(self.destination.stat().st_mode & 0o777, 0o644)
 
+    def test_new_directory_preserves_restrictive_umask(self):
+        previous = os.umask(0o077)
+        try:
+            self.provision()
+        finally:
+            os.umask(previous)
+        self.assertEqual(self.destination.parent.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(self.destination.stat().st_mode & 0o777, 0o644)
+
+    def test_sticky_writable_directory_appearing_during_preparation_is_refused(self):
+        safe_directory = completions.safe_directory
+        def appeared(path):
+            path.mkdir()
+            path.chmod(0o1775)
+            return safe_directory(path)
+        with patch.object(completions, "safe_directory", side_effect=appeared):
+            with self.assertRaisesRegex(BootstrapError, "writable by group/others"):
+                completions.completion_directory(self.ctx)
+        self.assertEqual(self.destination.parent.stat().st_mode & 0o7777, 0o1775)
+
     def test_discoverable_system_completion_needs_no_user_copy_or_generator(self):
         with patch("bootstrap_lib.completions.system_completion", return_value=self.binary):
             self.provision()

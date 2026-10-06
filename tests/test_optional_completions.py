@@ -347,6 +347,27 @@ else:
             self.provision()
         self.assertFalse(self.destination.parent.exists())
 
+    def test_new_native_parents_preserve_restrictive_umask(self):
+        prior = os.umask(0o077)
+        try:
+            self.provision()
+        finally:
+            os.umask(prior)
+        self.assertEqual(self.destination.parent.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(self.destination.parent.parent.stat().st_mode & 0o777, 0o700)
+        self.assertEqual(self.destination.stat().st_mode & 0o777, 0o644)
+
+    def test_sticky_writable_parent_appearing_during_preparation_is_refused(self):
+        safe_directory = providers.safe_directory
+        def appeared(path):
+            path.mkdir(parents=True)
+            path.parent.chmod(0o1775)
+            return safe_directory(path)
+        with patch.object(providers, "safe_directory", side_effect=appeared):
+            with self.assertRaisesRegex(BootstrapError, "Insecure Juliaup completion parent"):
+                providers.native_directory(self.ctx, self.destination.parent)
+        self.assertEqual(self.destination.parent.parent.stat().st_mode & 0o7777, 0o1775)
+
     def test_reviewed_julia_adoption_reconciles_only_its_native_script(self):
         self.provision()
         self.destination.write_text(self.destination.read_text() + "# personal modification\n")

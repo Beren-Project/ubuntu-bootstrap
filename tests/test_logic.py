@@ -1,5 +1,6 @@
 """Logic/ownership regressions, using temporary homes and real filesystem checks."""
 import argparse
+from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from copy import deepcopy
 import io
 import json
@@ -331,6 +332,106 @@ class PublicationTests(unittest.TestCase):
             system_assets.publish(self.ctx, self.staged, self.destination)
         self.assertEqual((self.destination / "binary").read_text(), "working first version")
         self.assertTrue(interrupted.is_dir())
+
+
+class InstallationUmaskTests(unittest.TestCase):
+    @staticmethod
+    def current_mask():
+        prior = os.umask(0o077)
+        os.umask(prior)
+        return prior
+
+    def invoke(self, home, handler, *, enter=False):
+        config = load_manifest()
+        config["defaults"] = ["apt"]
+        original_run = Context.run
+        def run(ctx, argv, **kwargs):
+            if kwargs.get("sudo"):
+                return 0  # No system operations in this CLI fixture.
+            return original_run(ctx, argv, **kwargs)
+        with ExitStack() as stack:
+            stack.enter_context(patch.dict(os.environ, {key: "" for key in
+                ("XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME")}))
+            stack.enter_context(patch.object(cli, "load_manifest", return_value=config))
+            stack.enter_context(patch.object(cli, "invoking_user", return_value=(pwd.getpwuid(os.getuid()), home)))
+            stack.enter_context(patch.object(cli, "detect", return_value="amd64"))
+            stack.enter_context(patch.object(cli.shutil, "which", return_value="/usr/bin/sudo"))
+            stack.enter_context(patch.object(Context, "run", run))
+            stack.enter_context(patch.object(cli.apt, "base", side_effect=handler))
+            stack.enter_context(patch.object(cli.completions, "provision", side_effect=lambda ctx, _: ctx.record("completion:gh", provider="system")))
+            stack.enter_context(patch.object(shell, "choose", return_value="/usr/bin/zsh"))
+            stack.enter_context(patch.object(shell, "should_enter", return_value=enter))
+            stack.enter_context(redirect_stdout(io.StringIO()))
+            stack.enter_context(redirect_stderr(io.StringIO()))
+            return cli.main(["--non-interactive", "--no-change-shell"])
+
+    def test_installation_mask_reaches_context_and_real_child_and_is_restored(self):
+        for mask in (0o002, 0o022, 0o077):
+            with self.subTest(mask=oct(mask)), tempfile.TemporaryDirectory() as tmp:
+                home = Path(tmp)
+                def handler(ctx):
+                    expected = mask | 0o022
+                    self.assertEqual(self.current_mask(), expected)
+                    self.assertEqual(ctx.state.stat().st_mode & 0o777, 0o777 & ~expected)
+                    code = ('import os, pathlib, sys; prior = os.umask(0o077); os.umask(prior); '
+                            'root = pathlib.Path(sys.argv[1]); (root / "child-dir").mkdir(); '
+                            '(root / "child-file").write_text("fixture"); print(prior)')
+                    self.assertEqual(int(ctx.output(["/usr/bin/python3", "-B", "-c", code, home])), expected)
+                    self.assertEqual((home / "child-dir").stat().st_mode & 0o777, 0o777 & ~expected)
+                    self.assertEqual((home / "child-file").stat().st_mode & 0o777, 0o666 & ~expected)
+                prior = os.umask(mask)
+                try:
+                    self.assertEqual(self.invoke(home, handler), 0)
+                    self.assertEqual(self.current_mask(), mask)
+                finally:
+                    os.umask(prior)
+
+    def test_original_mask_is_restored_on_handler_and_context_failure(self):
+        for failure in ("handler", "context"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as tmp:
+                home = Path(tmp)
+                if failure == "context":
+                    (home / ".local").mkdir()
+                    (home / ".local").chmod(0o775)
+                def handler(ctx):
+                    self.assertEqual(self.current_mask(), 0o022)
+                    raise BootstrapError("fixture failure")
+                prior = os.umask(0o002)
+                try:
+                    self.assertEqual(self.invoke(home, handler), 1)
+                    self.assertEqual(self.current_mask(), 0o002)
+                    if failure == "context":
+                        self.assertFalse((home / ".local/share").exists())
+                        self.assertEqual((home / ".local").stat().st_mode & 0o777, 0o775)
+                finally:
+                    os.umask(prior)
+
+    def test_original_mask_is_restored_before_login_exec_even_if_exec_fails(self):
+        for fail in (False, True):
+            with self.subTest(fail=fail), tempfile.TemporaryDirectory() as tmp:
+                def execute(*args):
+                    self.assertEqual(self.current_mask(), 0o002)
+                    if fail:
+                        raise OSError("fixture exec failure")
+                prior = os.umask(0o002)
+                try:
+                    with patch.object(cli.os, "execve", side_effect=execute) as execute_call:
+                        self.assertEqual(self.invoke(Path(tmp), lambda ctx: None, enter=True), int(fail))
+                    execute_call.assert_called_once()
+                    self.assertEqual(self.current_mask(), 0o002)
+                finally:
+                    os.umask(prior)
+
+    def test_help_and_plan_do_not_change_umask(self):
+        with patch.object(cli.os, "umask", side_effect=AssertionError("unexpected umask change")), \
+                redirect_stdout(io.StringIO()):
+            with self.assertRaises(SystemExit) as help_exit:
+                cli.main(["--help"])
+            self.assertEqual(help_exit.exception.code, 0)
+            with patch.object(cli, "invoking_user", return_value=(None, None)), \
+                    patch.object(cli, "detect", return_value="amd64"), patch.object(cli, "Context") as ctx:
+                self.assertEqual(cli.main(["--plan"]), 0)
+                ctx.assert_not_called()
 
 
 class ShellTests(unittest.TestCase):

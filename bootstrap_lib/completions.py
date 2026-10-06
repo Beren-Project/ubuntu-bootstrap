@@ -7,7 +7,7 @@ import tempfile
 
 from .platform import BootstrapError
 from .runtime import digest, safe_directory
-from .durability import RecoveryError, Transaction, fsync_directory
+from .durability import RecoveryError, Transaction
 from .inventories import normalize
 
 
@@ -45,11 +45,11 @@ def system_completion(ctx, command, fpath):
 
 def completion_directory(ctx):
     path = ctx.home / ".zfunc"
-    existing = path.exists() or path.is_symlink()
+    if not path.is_symlink() and path.exists() and path.stat().st_mode & 0o022:
+        raise BootstrapError(f"Completion directory is writable by group/others; Zsh would ignore it: {path}")
     directory = safe_directory(path)
-    if not existing:
-        directory.chmod(0o755)  # newly generated state must be safe even with a permissive umask
-        fsync_directory(directory)
+    # Completion parents are stricter than publication's sticky exception,
+    # including a directory that appeared after the initial check.
     if directory.stat().st_mode & 0o022:
         raise BootstrapError(f"Completion directory is writable by group/others; Zsh would ignore it: {directory}")
     return directory

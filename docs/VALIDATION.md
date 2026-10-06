@@ -24,6 +24,7 @@ records. It describes the current schema, ownership and recovery state machines.
 | [Dotfiles Cargo ownership alignment — 2026-10-05](#dotfiles-cargo-ownership-alignment--2026-10-05) | Update on clean `f5a20fc`; uncommitted | 136 tests plus isolated pinned-shell probes and static checks | Fresh x86_64 Ubuntu 26.04, all profiles, 592.42 s; no retry |
 | [CI semantics — 2026-10-05](#ci-semantics--2026-10-05) | Workflow/documentation update on clean `c7dca58`; uncommitted; runtime/tests unchanged | 136 tests on local 26.04 and container 24.04; workflow/static/documentation checks | Fresh x86_64 Ubuntu 26.04, all profiles, 580.10 s; no retry; real 24.04 production rejection |
 | [Documentation precommit review — 2026-10-05](#documentation-precommit-review--2026-10-05) | All ten Markdown files reviewed with the pending CI patch | Manifest/CLI/implementation cross-checks, local links and example syntax | No new installation run; preceding CI qualification inputs unchanged |
+| [Permissive-umask directory safety — 2026-10-05](#permissive-umask-directory-safety--2026-10-05) | Safe managed ancestry creation, installation-scoped umask and completion checks | 149 tests plus focused, static and documentation checks | Fresh x86_64 Ubuntu 26.04, all profiles, 577.68 s; verified caller umask 0002 |
 
 The focused completion run did not reinstall the all-profile engineering
 baseline. New documentation verification belongs in a separate dated record;
@@ -801,3 +802,131 @@ the preceding 136-test results, actual Ubuntu 24.04
 rejection and 580.10-second fresh Ubuntu 26.04 qualification remain the relevant
 evidence. External link availability and browser-rendered documentation were
 not rechecked. Nothing was staged, committed or pushed.
+
+## Permissive-umask directory safety — 2026-10-05
+
+Implementation began on clean `de6e129`. Nothing was staged, committed or pushed.
+
+The new regression sets umask 0002 before constructing Context, using both the
+default XDG layout and missing nested custom roots. Before the production fix,
+the real receipt publication failed with `Writable publication parent` because
+bootstrap's recursive mkdir created 0775 ancestry. Existing completion tests
+changed the mask only after Context setup and did not cover this boundary.
+The failing output is retained in
+`test-results/umask-20261005/before-fix-tests.log`.
+
+Managed paths now validate existing ancestry first, create each missing component
+explicitly with requested mode 0755, and fsync the new directory and its naming
+parent before descendants. Pre-existing unsafe paths are preserved and refused;
+there is no permission repair. The publication ancestry policy in `durability.py`
+is unchanged, including its sticky-directory exception. Managed-leaf ownership,
+symlink refusal and transaction/recovery rules remain enforced.
+
+The installation-only effective mask is the caller's mask OR 0022, applied before
+Context construction and inherited by child installers. Tests verify restoration
+after success, handler failure, Context failure and failed shell exec, and verify
+the original mask at final login-shell entry. Help and planning do not change
+the mask. Directory creation itself is also tested directly under the caller's
+mask, independently of the CLI policy:
+
+| Caller mask | Installation mask | New managed directories | Receipt files |
+| --- | --- | --- | --- |
+| 0002 | 0022 | 0755 | 0600 |
+| 0022 | 0022 | 0755 | 0600 |
+| 0077 | 0077 | 0700 | 0600 |
+
+Completion creation no longer uses post-creation chmod. Its stricter checks are
+retained around creation: concurrently appearing sticky writable base/native
+parents remain rejected even though generic publication permits sticky ancestry.
+Two additional regressions failed before this review correction and now pass;
+the failing output is retained in `before-review-fix-tests.log` in the same
+evidence directory. An initial qualification was stopped for this correction;
+its runner's signal/finally cleanup removed only its session-created container
+and preserved all seven original container identities, states and attachments.
+It is not counted as successful qualification.
+
+### Local checks
+
+```sh
+PYTHONPATH=tests /usr/bin/python3 -B -m unittest -v \
+  test_logic test_maintenance test_completions test_optional_completions
+./scripts/test
+git diff --check
+```
+
+The corrected focused suite passes **127 tests in 44.393 seconds**. The full
+suite passes **149 tests in 47.545 seconds**, without failures or skips, plus
+manifest loading, Python AST parsing, shell syntax and ShellCheck. The 13 new
+tests cover the root-cause seam, nested XDG creation, unsafe-path preservation,
+direct publication rejection, symlinks, concurrent directory appearance, child
+mask inheritance/restoration and restrictive base/native completion creation.
+The existing ancestry durability regression additionally checks safe permissions
+under 0002 at its fsync boundary. Existing ownership, migration, recovery,
+completion and Podman cleanup regressions remain included.
+
+The documentation review follows the existing CONTRIBUTING checklist: local
+links/anchors, shell example syntax, public CLI flags, exact dotfiles pin/five-file
+selection, defaults and manifest dependency edges. Historical evidence remains
+dated. No host-user bootstrap or live configuration restore was performed.
+
+### Fresh qualification and resources
+
+```sh
+./scripts/test-podman --scenario all
+```
+
+The final fresh Ubuntu 26.04 x86_64 run passed with **exit 0 in 577.68 seconds**,
+without reuse or retry. It used the normal `engineer` user, real platform
+detection and scoped sudo. Freshness assertions required absent `.local` and
+`.cache` ancestry before installation; fixtures did not pre-create or chmod
+managed paths. All five scenario bootstrap invocations set and verified **0002
+after Bash login startup**, before Stage 0. Unrelated integration fixtures use
+0022 independently.
+
+After base and engineering installation, all eleven checked managed directories
+were user-owned 0755: `.local`, `.local/share`, `.local/state`, `.cache`, their
+three `ubuntu-bootstrap` leaves, `.cargo`, `.cargo/bin`, `.rustup` and `.zfunc`.
+Receipts were 0600, and `.cargo/env` passed the regular-file safety check.
+Base/all-profile second passes, pinned-shell/Cargo resolution, optional-tool
+smoke checks, native Julia completions, equivalent verified legacy migration,
+deterministic recovery/retry regressions and scoped updates all passed. The final
+failed/skipped profile lists are empty. All **36 frozen runtime, manifest,
+script and test inputs** still match; no runtime or test edits followed the
+successful qualification.
+
+The independent resource comparison confirms **seven original stopped
+containers, twelve images, two volumes and three networks** are preserved.
+Container identities, states, exit codes, timestamps, ports, mounts and network
+attachments match; unordered attachment lists are compared as sets. Original
+image metadata/tags/digests and volume metadata match, with no new image IDs or
+digest observations. Network configuration matches; the built-in `podman`
+network's read-varying diagnostic `created` field is excluded. There are no
+running or project containers. No image, volume, network or global prune cleanup
+ran. The runner itself is unchanged and removed only the uniquely identified
+container created by each invocation:
+
+- Interrupted review run: `7e1026784c2c320362101ceb4a2373069dad54bb03c240f551c11e1ccf16a4a9`.
+- Successful final run: `5e174c6756b1d629d72b94c162a531b49d5282ad5bb27d56b159d09a8e1f4814`.
+
+Ignored `test-results/umask-20261005/` retains failing/passing unit outputs,
+observed modes, interrupted and successful qualification outputs, receipts,
+state/log snapshots, frozen input hashes, documentation checks and before/after
+resource inventories. `final-audit.json` records the successful run ID
+`cf4c908a00be408a9b36ef6280e2189f`, complete resource comparisons and input checks.
+The temporary documentation/resource check scripts are also retained there.
+Final documentation checks pass **101 local links/anchors**, **24 shell example
+blocks**, all **16 public CLI flags** and the manifest/restore/dependency
+contracts. `git diff --check` passes. Nothing was staged, committed or pushed;
+HEAD remains `de6e129`.
+
+### Limits
+
+Qualification uses controlled login Bash startup with non-interactive bootstrap
+and the existing separate PTY consent checks; it does not qualify a live WSL
+terminal or desktop/Wayland session. ARM64 and hosted GitHub Actions were not
+run. The original mask's restoration at final login-shell exec is regression
+tested with a controlled exec boundary. Existing path checks remain path-based;
+this change does not claim complete resistance to concurrent same-user/root
+path replacement or arbitrary storage/hardware failure, nor transactional
+recovery of third-party installer internals. Pre-existing unsafe paths remain
+an operator-review boundary.

@@ -12,7 +12,7 @@ import time
 import urllib.request
 
 from .platform import BootstrapError
-from .durability import RecoveryError, Transaction, atomic_bytes, fsync_directory, json_bytes, regular
+from .durability import RecoveryError, Transaction, atomic_bytes, fsync_directory, json_bytes, parents, regular
 from .inventories import normalize
 
 
@@ -26,14 +26,28 @@ def safe_directory(path):
     if any(p.is_symlink() for p in (path, *path.parents)):
         raise BootstrapError(f"Refusing managed directory with symlinked path: {path}")
     missing = [p for p in (path, *path.parents) if not p.exists()]
-    path.mkdir(parents=True, exist_ok=True)
-    if path.stat().st_uid != os.getuid():
-        raise BootstrapError(f"Managed directory belongs to another user: {path}")
-    # Flush each new directory and the parent entry that names it. Flushing
-    # only a later receipt/artifact parent cannot persist its own ancestry.
-    for directory in missing:
+    anchor = missing[-1].parent if missing else path
+    # Include the anchor itself in the publication ancestry check, before
+    # creating anything below it. Existing paths are never permission-repaired.
+    parents(anchor / "ownership-check")
+    for directory in reversed(missing):
+        parents(directory)
+        try:
+            directory.mkdir(mode=0o755)
+        except FileExistsError:
+            # A concurrent creator is not proof that we own a safe directory.
+            pass
+        if directory.is_symlink():
+            raise BootstrapError(f"Refusing managed directory with symlinked path: {directory}")
+        parents(directory / "ownership-check")
+        if directory.stat().st_uid != os.getuid():
+            raise BootstrapError(f"Managed directory belongs to another user: {directory}")
+        # Persist the new directory and the entry naming it before descendants.
         fsync_directory(directory)
         fsync_directory(directory.parent)
+    parents(path / "ownership-check")
+    if path.stat().st_uid != os.getuid():
+        raise BootstrapError(f"Managed directory belongs to another user: {path}")
     return path
 
 

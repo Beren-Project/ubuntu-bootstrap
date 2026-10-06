@@ -4,17 +4,107 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import pwd
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from test_logic import context
 from bootstrap_lib import cargo_binary, durability, inventories, julia, migration, rust
-from bootstrap_lib.config import ROOT, resolve
+from bootstrap_lib.config import ROOT, load_manifest, resolve
 from bootstrap_lib.platform import BootstrapError
-from bootstrap_lib.runtime import digest, safe_directory
+from bootstrap_lib.runtime import Context, digest, safe_directory
+
+
+class ManagedDirectoryTests(unittest.TestCase):
+    def test_context_ancestry_and_publication_under_caller_masks(self):
+        # Set the mask BEFORE Context: completion tests previously missed this seam.
+        for mask, mode in ((0o002, 0o755), (0o022, 0o755), (0o077, 0o700)):
+            for custom in (False, True):
+                with self.subTest(mask=oct(mask), custom=custom), tempfile.TemporaryDirectory() as tmp:
+                    home = Path(tmp)
+                    roots = {key: str(home / "custom" / key / "nested") if custom else ""
+                             for key in ("XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME")}
+                    prior = os.umask(mask)
+                    try:
+                        with patch.dict(os.environ, roots):
+                            ctx = Context(load_manifest(), SimpleNamespace(), pwd.getpwuid(os.getuid()), home, "amd64")
+                        ctx.record("completion:gh", [Path("/usr/bin/true")], provider="system")
+                        ctx.write_state("last-run.json", {"failed": []})
+                    finally:
+                        os.umask(prior)
+                    for directory in home.rglob("*"):
+                        if directory.is_dir():
+                            self.assertEqual(directory.stat().st_mode & 0o777, mode, directory)
+                            self.assertEqual(directory.stat().st_uid, os.getuid())
+                    self.assertEqual(ctx.receipts_path.stat().st_mode & 0o777, 0o600)
+                    self.assertEqual(json.loads(ctx.receipts_path.read_text())["completion:gh"]["provider"], "system")
+
+    def test_existing_writable_ancestry_is_preserved_before_creation(self):
+        for location in ("leaf", "parent"):
+            with self.subTest(location=location), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                unsafe = root / "unsafe"
+                unsafe.mkdir()
+                sentinel = unsafe / "personal"
+                sentinel.write_text("preserved")
+                unsafe.chmod(0o775)
+                requested = unsafe if location == "leaf" else unsafe / "new/leaf"
+                with self.assertRaisesRegex(durability.RecoveryError, "Writable publication parent"):
+                    safe_directory(requested)
+                self.assertEqual(unsafe.stat().st_mode & 0o777, 0o775)
+                self.assertEqual(sentinel.read_text(), "preserved")
+                self.assertFalse((unsafe / "new").exists())
+
+    def test_publication_still_rejects_writable_ancestry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            unsafe = root / "unsafe"
+            unsafe.mkdir()
+            leaf = unsafe / "leaf"
+            leaf.mkdir()
+            unsafe.chmod(0o775)
+            with self.assertRaisesRegex(durability.RecoveryError, "Writable publication parent"):
+                durability.atomic_bytes(leaf / "receipt", b"new")
+            self.assertEqual(list(leaf.iterdir()), [])
+
+    def test_leaf_ancestor_and_dangling_symlinks_are_preserved(self):
+        for dangling in (False, True):
+            for nested in (False, True):
+                with self.subTest(dangling=dangling, nested=nested), tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    target = root / "target"
+                    if not dangling:
+                        target.mkdir()
+                    link = root / "link"
+                    link.symlink_to(target)
+                    with self.assertRaisesRegex(BootstrapError, "symlink"):
+                        safe_directory(link / "new" if nested else link)
+                    self.assertTrue(link.is_symlink())
+                    self.assertFalse((target / "new").exists())
+
+    def test_directory_appearing_during_creation_is_validated_not_chmodded(self):
+        for unsafe in (False, True):
+            with self.subTest(unsafe=unsafe), tempfile.TemporaryDirectory() as tmp:
+                destination = Path(tmp) / "appeared"
+                mkdir = Path.mkdir
+                def appeared(path, *args, **kwargs):
+                    if path == destination:
+                        mkdir(path, mode=0o700)
+                        if unsafe:
+                            path.chmod(0o775)
+                        raise FileExistsError(str(path))
+                    return mkdir(path, *args, **kwargs)
+                with patch.object(Path, "mkdir", appeared):
+                    if unsafe:
+                        with self.assertRaisesRegex(durability.RecoveryError, "Writable publication parent"):
+                            safe_directory(destination)
+                    else:
+                        self.assertEqual(safe_directory(destination), destination)
+                self.assertEqual(destination.stat().st_mode & 0o777, 0o775 if unsafe else 0o700)
 
 
 class Environment(unittest.TestCase):
@@ -215,9 +305,15 @@ class RecoveryTests(Environment):
         flushed = []
         def flush(path):
             self.assertTrue(Path(path).is_dir())
+            if Path(path).is_relative_to(destination.parent.parent):
+                self.assertFalse(Path(path).stat().st_mode & 0o022)
             flushed.append(Path(path))
-        with patch("bootstrap_lib.runtime.fsync_directory", side_effect=flush):
-            safe_directory(destination)
+        prior = os.umask(0o002)
+        try:
+            with patch("bootstrap_lib.runtime.fsync_directory", side_effect=flush):
+                safe_directory(destination)
+        finally:
+            os.umask(prior)
         for directory in (destination, destination.parent, destination.parent.parent):
             self.assertIn(directory, flushed)
             self.assertIn(directory.parent, flushed)

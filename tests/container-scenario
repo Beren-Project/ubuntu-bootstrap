@@ -1,10 +1,19 @@
 #!/bin/bash
 # Runs entirely as the normal integration user. Stage 0 obtains Python if absent.
 set -euo pipefail
+# Fixture permissions are independent of the bootstrap caller being qualified.
+umask 0022
 scenario=${1:-all}
 freshness=${2:-fresh}
 cd /workspace
+bootstrap_with_umask() {
+    # Set and verify AFTER login startup, before Stage 0's first user operation.
+    bash -lc 'umask 0002; [[ $(umask) == 0002 ]] || exit 1; printf "VERIFY bootstrap caller umask 0002 (login Bash)\n"; exec /workspace/bootstrap "$@"' bootstrap-umask "$@"
+}
 if [[ "$freshness" == fresh ]]; then
+    for directory in "$HOME/.local" "$HOME/.cache"; do
+        [[ ! -e "$directory" && ! -L "$directory" ]] || { echo "ERROR fresh managed ancestry already exists: $directory"; exit 1; }
+    done
     mkdir -p "$HOME/.config/zellij" "$HOME/.config/mermaid"
     printf 'excluded zellij sentinel\n' > "$HOME/.config/zellij/config.kdl"
     printf 'excluded mermaid sentinel\n' > "$HOME/.config/mermaid/pptr.json"
@@ -21,31 +30,33 @@ if [[ "$scenario" == all || "$scenario" == base ]]; then
         echo 'ERROR whole-program root invocation accepted'; exit 1
     fi
     grep -q 'normal user' "$HOME/root-rejection.log"
-    /workspace/bootstrap --non-interactive --no-change-shell
+    bootstrap_with_umask --non-interactive --no-change-shell
+    /usr/bin/python3 -B /workspace/tests/container_checks.py managed_directories
     if [[ "$freshness" == fresh ]]; then
         /usr/bin/python3 -B /workspace/tests/container_checks.py unselected_completions
     fi
     /usr/bin/python3 -B /workspace/tests/container_checks.py base
     /usr/bin/python3 -B /workspace/tests/container_checks.py snapshot
-    /workspace/bootstrap --non-interactive --no-change-shell
+    bootstrap_with_umask --non-interactive --no-change-shell
     /usr/bin/python3 -B /workspace/tests/container_checks.py repeat
     /usr/bin/python3 -B /workspace/tests/container_checks.py prompts
     /usr/bin/python3 -B /workspace/tests/container_checks.py failures
     /usr/bin/python3 -B /workspace/tests/container_checks.py completion_update
 fi
 if [[ "$scenario" == all || "$scenario" == engineering ]]; then
-    /workspace/bootstrap --non-interactive --no-change-shell --build --ngspice --openmodelica --vim --nvim --emacs --julia
+    bootstrap_with_umask --non-interactive --no-change-shell --build --ngspice --openmodelica --vim --nvim --emacs --julia
+    /usr/bin/python3 -B /workspace/tests/container_checks.py managed_directories
     /usr/bin/python3 -B /workspace/tests/container_checks.py engineering
     /usr/bin/python3 -B /workspace/tests/container_checks.py legacy_migration
     /usr/bin/python3 -B /workspace/tests/container_checks.py recovery_regressions
     /usr/bin/python3 -B /workspace/tests/container_checks.py cargo_retry_regressions
     /usr/bin/python3 -B /workspace/tests/container_checks.py snapshot
-    /workspace/bootstrap --non-interactive --no-change-shell --build --ngspice --openmodelica --vim --nvim --emacs --julia
+    bootstrap_with_umask --non-interactive --no-change-shell --build --ngspice --openmodelica --vim --nvim --emacs --julia
     /usr/bin/python3 -B /workspace/tests/container_checks.py repeat
 fi
 if [[ "$scenario" == all || "$scenario" == update ]]; then
     /usr/bin/python3 -B /workspace/tests/container_checks.py unrelated
-    /workspace/bootstrap --non-interactive --no-change-shell --update --build --ngspice --openmodelica --vim --nvim --emacs --julia
+    bootstrap_with_umask --non-interactive --no-change-shell --update --build --ngspice --openmodelica --vim --nvim --emacs --julia
     /usr/bin/python3 -B /workspace/tests/container_checks.py update
 fi
 echo "OK real Ubuntu 26.04 integration ($scenario, $freshness)"

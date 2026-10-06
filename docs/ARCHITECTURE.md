@@ -71,6 +71,20 @@ the corresponding XDG roots, defaulting to `~/.local/share`, `~/.cache` and
 `~/.local/state`, each with an `ubuntu-bootstrap` subdirectory. Managed directory
 paths cannot traverse symlinks or belong to another user.
 
+Each missing path component is created explicitly from the nearest existing
+ancestor toward the requested leaf, requesting 0755 permissions. Restrictive
+caller masks still apply, so 0077 produces 0700 directories. Existing ancestry
+is checked before creating descendants; pre-existing unsafe paths are preserved
+and refused, never chmodded. Every new directory and its naming parent are
+fsynced before creating the next component.
+
+Installation uses the caller's umask OR 0022, before Context construction and
+through child installers. A caller mask of 0002 therefore becomes 0022 during
+installation, while 0077 remains 0077. The original mask is restored on success
+or failure and before entering a final interactive login shell. Help and planning
+do not change it. Publication continues to reject symlinked/non-directory
+ancestry and non-sticky parents writable by group/others.
+
 The CLI takes a nonblocking exclusive `flock` on the state directory's `lock`
 before installation; a second bootstrap using that state directory is refused.
 The plan path precedes this lock. Commands and their output append to
@@ -170,7 +184,8 @@ under `/usr` first; Ubuntu's `_gh` remains system-owned. Otherwise the original
 normal user executes the owned application's generator and stages output in
 `~/.zfunc`. The first line must declare the command with `#compdef`, the file
 must contain autoload code and `zsh -n` must pass before atomic publication.
-New directories are 0755 and generated files 0644; existing insecure,
+New directories request 0755, with restrictive masks retained, and generated files
+are 0644; existing insecure,
 symlinked, unmanaged or externally edited artifacts are preserved and refused.
 
 Receipts observe generator executable hash, arguments and reported version;

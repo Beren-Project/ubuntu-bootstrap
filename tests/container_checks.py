@@ -27,6 +27,24 @@ def run(*args, **kwargs):
     return subprocess.run(args, check=True, text=True, capture_output=True, **kwargs).stdout.strip()
 
 
+def managed_directories():
+    from bootstrap_lib.durability import parents, regular
+    modes = {}
+    for name in (".local", ".local/share", ".local/share/ubuntu-bootstrap", ".local/state",
+                 ".local/state/ubuntu-bootstrap", ".cache", ".cache/ubuntu-bootstrap",
+                 ".cargo", ".cargo/bin", ".rustup", ".zfunc"):
+        path = HOME / name
+        assert not path.is_symlink() and path.is_dir(), path
+        assert path.stat().st_uid == os.getuid(), path
+        assert path.stat().st_mode & 0o777 == 0o755, path
+        parents(path / "ownership-check")
+        modes[name] = f"{path.stat().st_mode & 0o777:04o}"
+    for path in (RECEIPTS, HOME / ".cargo/env"):
+        regular(path)
+    assert RECEIPTS.stat().st_mode & 0o777 == 0o600
+    print("OK managed directories under caller umask 0002: " + json.dumps(modes, sort_keys=True))
+
+
 def fingerprint():
     receipts = json.loads(RECEIPTS.read_text())
     native_paths = {path for name, entry in receipts.items()

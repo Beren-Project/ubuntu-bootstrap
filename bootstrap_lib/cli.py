@@ -44,6 +44,7 @@ def arguments(argv=None):
 
 def main(argv=None):
     ctx = None
+    caller_umask = None
     try:
         args = arguments(argv)
         config = load_manifest()
@@ -66,6 +67,10 @@ def main(argv=None):
             return 0
         if not shutil.which("sudo", path="/usr/bin:/bin"):
             raise BootstrapError("Install sudo and give your normal user sudo access first")
+        # Restrict creation by bootstrap and child installers; never relax a
+        # caller's private mask. The temporary mask used to read it is private too.
+        caller_umask = os.umask(0o077)
+        os.umask(caller_umask | 0o022)
         ctx = Context(config, args, user, home, arch, defer_state=True)
         lock_path = ctx.state / "lock"
         if lock_path.is_symlink():
@@ -137,6 +142,8 @@ def main(argv=None):
                 return 1
             ctx.status("OK", "bootstrap", "ready")
         if login and shell.should_enter(args):
+            os.umask(caller_umask)
+            caller_umask = None
             os.execve(login, ["-zsh"], ctx.env)
         return 0
     except (BootstrapError, OSError, ValueError, KeyboardInterrupt) as error:
@@ -144,6 +151,9 @@ def main(argv=None):
         if ctx:
             print(f"Log: {ctx.log_path}", file=sys.stderr)
         return 130 if isinstance(error, KeyboardInterrupt) else 1
+    finally:
+        if caller_umask is not None:
+            os.umask(caller_umask)
 
 
 if __name__ == "__main__":

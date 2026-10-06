@@ -11,7 +11,7 @@ import tempfile
 from .completions import normal_user, validate
 from .platform import BootstrapError
 from .runtime import digest, safe_directory
-from .durability import RecoveryError, Transaction, fsync_directory
+from .durability import RecoveryError, Transaction
 from .inventories import normalize
 
 
@@ -181,21 +181,19 @@ _julia_channel || exit 5
 
 def native_directory(ctx, path):
     """Validate existing parents; secure only directories this call creates."""
-    missing = []
-    for parent in (path, *path.parents):
-        if parent == ctx.home.parent:
-            break
-        if parent.is_symlink():
-            raise BootstrapError(f"Refusing symlinked Juliaup completion parent: {parent}")
-        if not parent.exists():
-            missing.append(parent)
-        elif (not parent.is_dir() or parent.stat().st_uid != ctx.user.pw_uid
-              or parent.stat().st_mode & 0o022):
-            raise BootstrapError(f"Insecure Juliaup completion parent: {parent}")
+    def validate_parents():
+        for parent in (path, *path.parents):
+            if parent == ctx.home.parent:
+                break
+            if parent.is_symlink():
+                raise BootstrapError(f"Refusing symlinked Juliaup completion parent: {parent}")
+            if parent.exists() and (not parent.is_dir() or parent.stat().st_uid != ctx.user.pw_uid
+                                    or parent.stat().st_mode & 0o022):
+                raise BootstrapError(f"Insecure Juliaup completion parent: {parent}")
+    validate_parents()
     directory = safe_directory(path)
-    for parent in missing:
-        parent.chmod(0o755)
-        fsync_directory(parent)
+    # Keep the native provider's stricter rules for concurrent creators too.
+    validate_parents()
     return directory
 
 

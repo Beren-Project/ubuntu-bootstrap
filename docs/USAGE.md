@@ -322,8 +322,8 @@ This exception does not adopt other `.zfunc` files. Custom `JULIAUP_DEPOT_PATH`
 values incompatible with the pinned native location are refused.
 
 Native scripts and existing parents writable by group/others are preserved and
-refused, including on ordinary reruns. Newly created native directories are 0755
-and generated scripts are 0644 even with a permissive umask. Publication and
+refused, including on ordinary reruns. Newly created native directories request
+0755 (0700 with umask 0077), and generated scripts are 0644. Publication and
 the paired native receipts roll back on caught failures/interruption before
 commit. After commit, later interruption or recovery-copy cleanup failure keeps
 the matching new script and receipts intact. If rollback
@@ -331,6 +331,20 @@ itself fails, bootstrap reports the exact retained script/receipt backup path;
 inspect that recovery copy before making any manual repair.
 
 ## Paths and diagnostics
+
+Bootstrap creates missing managed directory ancestry with safe permissions from
+the first missing component through the leaf, including missing `.local`,
+`.local/share`, `.local/state` and `.cache` directories. During installation,
+bootstrap and child installers use your umask OR 0022: 0002 becomes 0022;
+0077 remains restrictive. Your original mask is restored before final shell
+entry or return. Help and `--plan` do not change it.
+
+Pre-existing group/other-writable, non-sticky publication ancestry is preserved
+and rejected. This includes unsafe directories left by an older failed run;
+changing the shell's umask does not repair their existing permissions. Review
+the reported path's ownership, contents and sharing requirements before making
+any manual permission change. Bootstrap does not recursively chmod existing
+directories or waive publication checks through `--adopt`.
 
 | Path | Role/owner |
 | --- | --- |
